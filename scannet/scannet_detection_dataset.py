@@ -86,6 +86,7 @@ class ScannetDetectionDataset(Dataset):
         else:
             point_cloud = mesh_vertices[:,0:6] 
             point_cloud[:,3:] = (point_cloud[:,3:]-MEAN_COLOR_RGB)/256.0
+            pcl_color = mesh_vertices[:,3:6]
         
         if self.use_height:
             floor_height = np.percentile(point_cloud[:,2],0.99)

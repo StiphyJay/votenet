@@ -1,0 +1,9 @@
+*.ipynb
+*.vscode
+*__pycache__
+demo_files/
+pointnet2/build/
+pointnet2/dist/
+pointnet2/pointnet2.egg-info/
+scannet/scannet_train_detection_data/
+scannet/scans
