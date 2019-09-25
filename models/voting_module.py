@@ -12,6 +12,7 @@ Author: Charles R. Qi and Or Litany
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from numpy import pi
 
 class VotingModule(nn.Module):
     def __init__(self, vote_factor, seed_feature_dim):
@@ -63,9 +64,92 @@ class VotingModule(nn.Module):
         vote_features = vote_features.transpose(2,1).contiguous()
         
         return vote_xyz, vote_features
- 
+
+
+class VotingModuleMulti(nn.Module):
+    def __init__(self, config, seed_feature_dim):
+        """ Votes generation from seed point features.
+
+        Args:
+            config: VoteConfig
+                for testing different configs
+            seed_feature_dim: int
+                number of channels of seed point features
+        """
+        super().__init__()
+        self.config = config
+        self.num_heading_bin = self.config.num_heading_bin
+        self.num_spatial_cls = self.config.num_spatial_cls
+        self.in_dim = seed_feature_dim
+        
+        # TODO: layer parameter
+        self.out_vote_dim = 3 + self.in_dim + 1 # (r, z, theta) + (feature) + score
+        self.conv1 = torch.nn.Conv1d(self.in_dim, self.in_dim, 1)
+        self.conv2 = torch.nn.Conv1d(self.in_dim, self.in_dim, 1)
+        self.conv3 = torch.nn.Conv1d(self.in_dim, self.num_spatial_cls*self.out_vote_dim, 1)
+        self.bn1 = torch.nn.BatchNorm1d(self.in_dim)
+        self.bn2 = torch.nn.BatchNorm1d(self.in_dim)
+        
+    def forward(self, seed_xyz, seed_features):
+        """ Forward pass.
+
+        Arguments:
+            seed_xyz: (batch_size, num_seed, 3) Pytorch tensor
+            seed_features: (batch_size, feature_dim, num_seed) Pytorch tensor
+
+        Returns: Note that for the convenience of choosing top n vote, return shape is different
+            vote_xyz: (batch_size, num_seed, num_spatial_cls, 3)
+            vote_features: (batch_size, num_seed, num_spatial_cls, vote_feature_dim)
+            vote_spatial_score: (batch_size, num_seed, num_spatial_cls)
+        """
+        batch_size = seed_xyz.shape[0]
+        num_seed = seed_xyz.shape[1]
+
+        net = F.relu(self.bn1(self.conv1(seed_features))) 
+        net = F.relu(self.bn2(self.conv2(net))) 
+        net = self.conv3(net) # (batch_size, num_spatial_cls*(3+out_dim+1), num_seed)
+                
+        net = net.transpose(2,1).view(batch_size, num_seed, self.num_spatial_cls, self.out_vote_dim)
+        
+        # parse offset
+        offset_r = self.config.parse_r(net[:,:,:,0]) # (batch_size, num_seed, num_spatial_cls)
+        offset_z = self.config.parse_z(net[:,:,:,1]) # (batch_size, num_seed, num_spatial_cls)
+        
+        if self.config.normalized_rz:
+            offset_r *= self.config.max_r
+            offset_z *= self.config.max_z
+        
+        offset_z[:,:,self.num_heading_bin:] *= -1.0
+        
+        res_theta = net[:,:,:,2] * self.config.max_theta
+        start_theta = torch.arange(self.num_heading_bin, dtype=torch.float32, device=res_theta.device) * (2 * pi) / self.num_heading_bin
+        start_theta = start_theta.repeat(2).view(1, 1, -1)
+        offset_theta = res_theta + start_theta # (batch_size, num_seed, num_spatial_cls)
+
+        offset_x = offset_r * torch.cos(offset_theta)
+        offset_y = offset_r * torch.sin(offset_theta)
+        offset_xyz = torch.cat((offset_x.unsqueeze(3), offset_y.unsqueeze(3), offset_z.unsqueeze(3)), dim=3) # (batch_size, num_seed, num_spatial_cls, 3)
+        
+        vote_xyz = seed_xyz.unsqueeze(2) + offset_xyz # (batch_size, num_seed, num_spatial_cls, 3)
+        
+        residual_features = net[:,:,:,3:-1] # (batch_size, num_seed, num_spatial_cls, out_dim)
+        vote_features = seed_features.transpose(2,1).unsqueeze(2) + residual_features
+
+        vote_spatial_score = net[:,:,:,-1] # (batch_size, num_seed, num_spatial_cls)
+        
+        return vote_xyz.contiguous(), vote_features.contiguous(), vote_spatial_score.contiguous()
+
+# testing
 if __name__=='__main__':
     net = VotingModule(2, 256).cuda()
     xyz, features = net(torch.rand(8,1024,3).cuda(), torch.rand(8,256,1024).cuda())
     print('xyz', xyz.shape)
     print('features', features.shape)
+
+    from model_util_vote import VoteConfig
+    net = VotingModuleMulti(VoteConfig(), 256).cuda()
+    xyz, features, score = net(torch.rand(8,1024,3).cuda(), torch.rand(8,256,1024).cuda())
+    print()
+    print('xyz_multi', xyz.size())
+    print('features_multi', features.size())
+    print('score', score.size())
