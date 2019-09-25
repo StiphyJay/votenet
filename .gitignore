@@ -7,3 +7,5 @@ pointnet2/dist/
 pointnet2/pointnet2.egg-info/
 scannet/scannet_train_detection_data/
 scannet/scans
+sunrgbd/sunrgbd_pc_bbox_votes_50k_v1_train
+sunrgbd/sunrgbd_pc_bbox_votes_50k_v1_val
