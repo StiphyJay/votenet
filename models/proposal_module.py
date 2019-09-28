@@ -95,6 +95,7 @@ class ProposalModule(nn.Module):
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
         elif self.sampling == 'random':
             # Random sampling from the votes
+            batch_size = end_points['seed_xyz'].shape[0]
             num_seed = end_points['seed_xyz'].shape[1]
             sample_inds = torch.randint(0, num_seed, (batch_size, self.num_proposal), dtype=torch.int).cuda()
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
@@ -175,6 +176,7 @@ class ProposalModuleMulti(nn.Module):
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
         elif self.sampling == 'random':
             # Random sampling from the votes
+            batch_size = end_points['seed_xyz'].shape[0]
             num_seed = end_points['seed_xyz'].shape[1]
             sample_inds = torch.randint(0, num_seed, (batch_size, self.num_seed_fps), dtype=torch.int).cuda()
             sample_inds *= self.num_vote
