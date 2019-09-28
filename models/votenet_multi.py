@@ -20,7 +20,7 @@ from backbone_module import Pointnet2Backbone
 from voting_module import VotingModuleMulti
 from model_util_vote import VoteConfig
 from proposal_module import ProposalModuleMulti
-from dump_helper import dump_results
+from dump_helper_multi import dump_results
 from loss_helper_multi import get_loss
 
 
