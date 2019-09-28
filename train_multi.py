@@ -68,7 +68,7 @@ parser.add_argument('--dump_results', action='store_true', help='Dump results.')
 
 parser.add_argument('--num_heading_bin', type=int, required=True, help='num_heading_bin for spatial discrete')
 parser.add_argument('--top_n_votes', type=int, required=True, help='Top n votes')
-parser.add_argument('--vote_cls_loss_weight', type=int, required=True, help='vote_cls_loss_weight')
+parser.add_argument('--vote_cls_loss_weight', type=float, required=True, help='vote_cls_loss_weight')
 FLAGS = parser.parse_args()
 
 # ------------------------------------------------------------------------- GLOBAL CONFIG BEG
@@ -259,7 +259,7 @@ def train_one_epoch():
 
         # Accumulate statistics and print out
         for key in end_points:
-            if 'loss' in key or 'acc' in key or 'ratio' in key:
+            if ('loss' in key or 'acc' in key or 'ratio' in key) and key != 'vote_cls_loss_weight':
                 if key not in stat_dict: stat_dict[key] = 0
                 stat_dict[key] += end_points[key].item()
 
@@ -287,6 +287,9 @@ def evaluate_one_epoch():
         inputs = {'point_clouds': batch_data_label['point_clouds']}
         end_points = net(inputs)
 
+        # add vote_cls_loss_weight to end_points
+        end_points['vote_cls_loss_weight'] = FLAGS.vote_cls_loss_weight
+
         # Compute loss
         for key in batch_data_label:
             assert(key not in end_points)
@@ -295,7 +298,7 @@ def evaluate_one_epoch():
 
         # Accumulate statistics and print out
         for key in end_points:
-            if 'loss' in key or 'acc' in key or 'ratio' in key:
+            if ('loss' in key or 'acc' in key or 'ratio' in key) and key != 'vote_cls_loss_weight':
                 if key not in stat_dict: stat_dict[key] = 0
                 stat_dict[key] += end_points[key].item()
 

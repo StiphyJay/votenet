@@ -15,8 +15,8 @@ class VoteConfig(object):
                  normalized_rz=True,
                  max_r=5.75,
                  max_z=1.6,
-                 parse_r=F.softplus,
-                 parse_z=F.softplus,
+                 parse_r=F.relu,
+                 parse_z=F.relu,
                  top_n_votes=3):
         
         self.num_heading_bin = num_heading_bin
