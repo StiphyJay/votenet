@@ -42,7 +42,7 @@ def compute_vote_loss(end_points):
     # Load ground truth votes and assign them to seed points
     batch_size = end_points['seed_xyz'].shape[0]
     num_seed = end_points['seed_xyz'].shape[1] # B,num_seed,3
-    vote_xyz = end_points['vote_xyz'] # B,num_seed*vote_factor,3
+    vote_xyz = end_points['vote_xyz'] # B, num_seed*num_vote, 3
     seed_inds = end_points['seed_inds'].long() # B,num_seed in [0,num_points-1]
 
     # Get groundtruth votes for the seed points
@@ -62,7 +62,7 @@ def compute_vote_loss(end_points):
     vote_cls_loss = torch.sum(vote_cls_error*seed_gt_votes_mask.float()) / (torch.sum(seed_gt_votes_mask.float())+1e-6)
 
     # Compute the min of min of distance
-    vote_xyz_reshape = vote_xyz.view(batch_size*num_seed, -1, 3) # from B,num_seed*vote_factor,3 to B*num_seed,num_vote,3
+    vote_xyz_reshape = vote_xyz.view(batch_size*num_seed, -1, 3) # from B,num_seed*num_vote,3 to B*num_seed,num_vote,3
     seed_gt_votes_reshape = seed_gt_votes.view(batch_size*num_seed, 1, 3) # from B,num_seed,3 to B*num_seed,1,3
     # A predicted vote to no where is not penalized as long as there is a good vote near the GT vote.
     _, _, dist2, _ = nn_distance(vote_xyz_reshape, seed_gt_votes_reshape, l1=True)

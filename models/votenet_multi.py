@@ -98,8 +98,6 @@ class VoteNetMulti(nn.Module):
         xyz, features, spatial_score = self.vgen(xyz, features)
         features_norm = torch.norm(features, p=2, dim=1)
         features = features.div(features_norm.unsqueeze(1))
-        end_points['vote_xyz'] = xyz # (batch_size, num_seed, num_spatial_cls, 3)
-        end_points['vote_features'] = features # (batch_size, num_seed, num_spatial_cls, vote_feature_dim)
         end_points['vote_spatial_score'] = spatial_score # (batch_size, num_seed, num_spatial_cls)
 
         # choose top_n_votes
@@ -111,10 +109,13 @@ class VoteNetMulti(nn.Module):
         top_n_spatial_score_ind_expand = top_n_spatial_score_ind.unsqueeze(-1).repeat(1,1,1,vote_feature_dim)
         features_top_n = torch.gather(features, 2, top_n_spatial_score_ind_expand) # (batch_size, num_seed, num_vote, vote_feature_dim)
 
-        xyz_top_n_reshape = xyz_top_n.view(batch_size, -1, 3) # (batch_size, num_seed*num_vote, 3)
-        features_top_n_reshape = features_top_n.view(batch_size, -1, vote_feature_dim).transpose(1, 2) # (batch_size, vote_feature_dim, num_seed*num_vote)
+        xyz_top_n_reshape = xyz_top_n.view(batch_size, -1, 3).contiguous() # (batch_size, num_seed*num_vote, 3)
+        features_top_n_reshape = features_top_n.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous() # (batch_size, vote_feature_dim, num_seed*num_vote)
 
-        end_points = self.pnet(xyz_top_n_reshape.contiguous(), features_top_n_reshape.contiguous(), end_points)
+        end_points['vote_xyz'] = xyz_top_n_reshape # (batch_size, num_seed*num_spatial_cls, 3)
+        end_points['vote_features'] = features_top_n_reshape # (batch_size, vote_feature_dim, num_seed*num_vote)
+
+        end_points = self.pnet(xyz_top_n_reshape, features_top_n_reshape, end_points)
 
         return end_points
 
