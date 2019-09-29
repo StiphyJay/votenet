@@ -69,8 +69,9 @@ parser.add_argument('--dump_results', action='store_true', help='Dump results.')
 parser.add_argument('--num_heading_bin', type=int, required=True, help='num_heading_bin for spatial discrete')
 parser.add_argument('--top_n_votes', type=int, required=True, help='Top n votes')
 parser.add_argument('--vote_cls_loss_weight', type=float, required=True, help='vote_cls_loss_weight')
-parser.add_argument('--vote_cls_loss_weight_decay_steps', type=str, required=True, help='vote_cls_loss_weight_decay_steps')
-parser.add_argument('--vote_cls_loss_weight_decay_rates', type=str, required=True, help='vote_cls_loss_weight_decay_rates')
+parser.add_argument('--vote_cls_loss_weight_decay', default=False, action='store_true', help='enable vote_cls_loss_weight_decay')
+parser.add_argument('--vote_cls_loss_weight_decay_steps', default=None, type=str, help='vote_cls_loss_weight_decay_steps')
+parser.add_argument('--vote_cls_loss_weight_decay_rates', default=None, type=str, help='vote_cls_loss_weight_decay_rates')
 FLAGS = parser.parse_args()
 
 # ------------------------------------------------------------------------- GLOBAL CONFIG BEG
@@ -93,8 +94,11 @@ FLAGS.DUMP_DIR = DUMP_DIR
 
 # vote_cls_loss_weight
 VOTE_CLS_LOSS_WEIGHT_BASE = FLAGS.vote_cls_loss_weight
-VOTE_CLS_LOSS_WEIGHT_DECAY_STEPS = [int(x) for x in FLAGS.vote_cls_loss_weight_decay_steps.split(',')]
-VOTE_CLS_LOSS_WEIGHT_DECAY_RATES = [float(x) for x in FLAGS.vote_cls_loss_weight_decay_rates.split(',')]
+if FLAGS.vote_cls_loss_weight_decay:
+    assert FLAGS.vote_cls_loss_weight_decay_steps is not None
+    assert FLAGS.vote_cls_loss_weight_decay_rates is not None
+    VOTE_CLS_LOSS_WEIGHT_DECAY_STEPS = [int(x) for x in FLAGS.vote_cls_loss_weight_decay_steps.split(',')]
+    VOTE_CLS_LOSS_WEIGHT_DECAY_RATES = [float(x) for x in FLAGS.vote_cls_loss_weight_decay_rates.split(',')]
 
 # Prepare LOG_DIR and DUMP_DIR
 if os.path.exists(LOG_DIR) and FLAGS.overwrite:
@@ -227,9 +231,10 @@ def adjust_learning_rate(optimizer, epoch):
 
 def get_current_vote_cls_loss_weight(epoch):
     weight = VOTE_CLS_LOSS_WEIGHT_BASE
-    for i, wt_decay_epoch in enumerate(VOTE_CLS_LOSS_WEIGHT_DECAY_STEPS):
-        if epoch >= wt_decay_epoch:
-            weight *= VOTE_CLS_LOSS_WEIGHT_DECAY_RATES[i]
+    if FLAGS.vote_cls_loss_weight_decay:
+        for i, wt_decay_epoch in enumerate(VOTE_CLS_LOSS_WEIGHT_DECAY_STEPS):
+            if epoch >= wt_decay_epoch:
+                weight *= VOTE_CLS_LOSS_WEIGHT_DECAY_RATES[i]
     return weight
 
 # TFBoard Visualizers
