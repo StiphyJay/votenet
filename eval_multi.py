@@ -49,6 +49,8 @@ parser.add_argument('--shuffle_dataset', action='store_true', help='Shuffle the 
 parser.add_argument('--num_heading_bin', type=int, required=True, help='num_heading_bin for spatial discrete')
 parser.add_argument('--top_n_votes', type=int, required=True, help='Top n votes')
 parser.add_argument('--vote_cls_loss_weight', type=float, required=True, help='vote_cls_loss_weight')
+parser.add_argument('--vote_cls_loss_weight_decay_steps', type=str, required=True, help='vote_cls_loss_weight_decay_steps')
+parser.add_argument('--vote_cls_loss_weight_decay_rates', type=str, required=True, help='vote_cls_loss_weight_decay_rates')
 FLAGS = parser.parse_args()
 
 if FLAGS.use_cls_nms:
@@ -62,6 +64,18 @@ CHECKPOINT_PATH = FLAGS.checkpoint_path
 assert(CHECKPOINT_PATH is not None)
 FLAGS.DUMP_DIR = DUMP_DIR
 AP_IOU_THRESHOLDS = [float(x) for x in FLAGS.ap_iou_thresholds.split(',')]
+
+# vote_cls_loss_weight
+VOTE_CLS_LOSS_WEIGHT_BASE = FLAGS.vote_cls_loss_weight
+VOTE_CLS_LOSS_WEIGHT_DECAY_STEPS = [int(x) for x in FLAGS.vote_cls_loss_weight_decay_steps.split(',')]
+VOTE_CLS_LOSS_WEIGHT_DECAY_RATES = [float(x) for x in FLAGS.vote_cls_loss_weight_decay_rates.split(',')]
+
+def get_current_vote_cls_loss_weight(epoch):
+    weight = VOTE_CLS_LOSS_WEIGHT_BASE
+    for i, wt_decay_epoch in enumerate(VOTE_CLS_LOSS_WEIGHT_DECAY_STEPS):
+        if epoch >= wt_decay_epoch:
+            weight *= VOTE_CLS_LOSS_WEIGHT_DECAY_RATES[i]
+    return weight
 
 # Prepare DUMP_DIR
 if not os.path.exists(DUMP_DIR): os.mkdir(DUMP_DIR)
@@ -149,6 +163,7 @@ def evaluate_one_epoch():
     stat_dict = {}
     ap_calculator_list = [APCalculator(iou_thresh, DATASET_CONFIG.class2type) \
         for iou_thresh in AP_IOU_THRESHOLDS]
+    vote_cls_loss_weight = get_current_vote_cls_loss_weight(epoch)
     net.eval() # set model to eval mode (for bn and dp)
     for batch_idx, batch_data_label in enumerate(TEST_DATALOADER):
         if batch_idx % 10 == 0:
@@ -161,7 +176,7 @@ def evaluate_one_epoch():
         end_points = net(inputs)
 
         # add vote_cls_loss_weight to end_points
-        end_points['vote_cls_loss_weight'] = FLAGS.vote_cls_loss_weight
+        end_points['vote_cls_loss_weight'] = vote_cls_loss_weight
 
         # Compute loss
         for key in batch_data_label:

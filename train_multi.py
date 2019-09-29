@@ -69,6 +69,8 @@ parser.add_argument('--dump_results', action='store_true', help='Dump results.')
 parser.add_argument('--num_heading_bin', type=int, required=True, help='num_heading_bin for spatial discrete')
 parser.add_argument('--top_n_votes', type=int, required=True, help='Top n votes')
 parser.add_argument('--vote_cls_loss_weight', type=float, required=True, help='vote_cls_loss_weight')
+parser.add_argument('--vote_cls_loss_weight_decay_steps', type=str, required=True, help='vote_cls_loss_weight_decay_steps')
+parser.add_argument('--vote_cls_loss_weight_decay_rates', type=str, required=True, help='vote_cls_loss_weight_decay_rates')
 FLAGS = parser.parse_args()
 
 # ------------------------------------------------------------------------- GLOBAL CONFIG BEG
@@ -88,6 +90,11 @@ DEFAULT_CHECKPOINT_PATH = os.path.join(LOG_DIR, 'checkpoint.tar')
 CHECKPOINT_PATH = FLAGS.checkpoint_path if FLAGS.checkpoint_path is not None \
     else DEFAULT_CHECKPOINT_PATH
 FLAGS.DUMP_DIR = DUMP_DIR
+
+# vote_cls_loss_weight
+VOTE_CLS_LOSS_WEIGHT_BASE = FLAGS.vote_cls_loss_weight
+VOTE_CLS_LOSS_WEIGHT_DECAY_STEPS = [int(x) for x in FLAGS.vote_cls_loss_weight_decay_steps.split(',')]
+VOTE_CLS_LOSS_WEIGHT_DECAY_RATES = [float(x) for x in FLAGS.vote_cls_loss_weight_decay_rates.split(',')]
 
 # Prepare LOG_DIR and DUMP_DIR
 if os.path.exists(LOG_DIR) and FLAGS.overwrite:
@@ -218,6 +225,13 @@ def adjust_learning_rate(optimizer, epoch):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
+def get_current_vote_cls_loss_weight(epoch):
+    weight = VOTE_CLS_LOSS_WEIGHT_BASE
+    for i, wt_decay_epoch in enumerate(VOTE_CLS_LOSS_WEIGHT_DECAY_STEPS):
+        if epoch >= wt_decay_epoch:
+            weight *= VOTE_CLS_LOSS_WEIGHT_DECAY_RATES[i]
+    return weight
+
 # TFBoard Visualizers
 TRAIN_VISUALIZER = TfVisualizer(FLAGS, 'train')
 TEST_VISUALIZER = TfVisualizer(FLAGS, 'test')
@@ -235,6 +249,7 @@ def train_one_epoch():
     stat_dict = {} # collect statistics
     adjust_learning_rate(optimizer, EPOCH_CNT)
     bnm_scheduler.step() # decay BN momentum
+    vote_cls_loss_weight = get_current_vote_cls_loss_weight(EPOCH_CNT)
     net.train() # set model to training mode
     for batch_idx, batch_data_label in enumerate(TRAIN_DATALOADER):
         for key in batch_data_label:
@@ -251,7 +266,7 @@ def train_one_epoch():
             end_points[key] = batch_data_label[key]
 
         # add vote_cls_loss_weight to end_points
-        end_points['vote_cls_loss_weight'] = FLAGS.vote_cls_loss_weight
+        end_points['vote_cls_loss_weight'] = vote_cls_loss_weight
 
         loss, end_points = criterion(end_points, DATASET_CONFIG)
         loss.backward()
@@ -276,6 +291,7 @@ def evaluate_one_epoch():
     stat_dict = {} # collect statistics
     ap_calculator = APCalculator(ap_iou_thresh=FLAGS.ap_iou_thresh,
         class2type_map=DATASET_CONFIG.class2type)
+    vote_cls_loss_weight = get_current_vote_cls_loss_weight(EPOCH_CNT)
     net.eval() # set model to eval mode (for bn and dp)
     for batch_idx, batch_data_label in enumerate(TEST_DATALOADER):
         if batch_idx % 10 == 0:
@@ -288,7 +304,7 @@ def evaluate_one_epoch():
         end_points = net(inputs)
 
         # add vote_cls_loss_weight to end_points
-        end_points['vote_cls_loss_weight'] = FLAGS.vote_cls_loss_weight
+        end_points['vote_cls_loss_weight'] = vote_cls_loss_weight
 
         # Compute loss
         for key in batch_data_label:
