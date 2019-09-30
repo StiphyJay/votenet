@@ -29,10 +29,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
+sys.path.append(os.path.join(ROOT_DIR, 'models'))
 import pc_util
 import sunrgbd_utils
 from model_util_sunrgbd import SunrgbdDatasetConfig
-from models.model_util_vote import VoteConfig
+from model_util_vote import VoteConfig
 
 DC = SunrgbdDatasetConfig() # dataset specific config
 MAX_NUM_OBJ = 64 # maximum number of objects allowed per scene
@@ -193,7 +194,7 @@ class SunrgbdDetectionVotesDatasetMulti(Dataset):
 
         point_cloud, choices = pc_util.random_sampling(point_cloud, self.num_points, return_choices=True)
         point_votes_mask = point_votes[choices,0]
-        point_votes = point_votes[choices,1:]
+        point_votes = point_votes[choices,1:4]
 
         # add spatial label
         votes_angle = np.arctan2(point_votes[:, 1], point_votes[:, 0])

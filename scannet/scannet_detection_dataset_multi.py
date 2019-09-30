@@ -16,11 +16,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(ROOT_DIR)
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
+sys.path.append(os.path.join(ROOT_DIR, 'models'))
 import pc_util
 from model_util_scannet import rotate_aligned_boxes
 
 from model_util_scannet import ScannetDatasetConfig
-from models.model_util_vote import VoteConfig
+from model_util_vote import VoteConfig
 DC = ScannetDatasetConfig()
 MAX_NUM_OBJ = 64
 MEAN_COLOR_RGB = np.array([109.8, 97.2, 83.8])
