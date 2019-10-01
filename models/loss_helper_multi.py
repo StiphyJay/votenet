@@ -58,7 +58,7 @@ def compute_vote_loss(end_points):
     # spatial class loss
     vote_spatial_score_reshape = end_points['vote_spatial_score'].transpose(1, 2).contiguous() # (batch_size, num_spatial_cls, num_seed)
     seed_gt_votes_cls = torch.gather(end_points['vote_label_cls'], 1, seed_inds) # (batch_size, num_seed)
-    vote_cls_error = F.cross_entropy(F.softmax(vote_spatial_score_reshape, dim=1), seed_gt_votes_cls, reduction='none')
+    vote_cls_error = F.cross_entropy(vote_spatial_score_reshape, seed_gt_votes_cls, reduction='none')
     vote_cls_loss = torch.sum(vote_cls_error*seed_gt_votes_mask.float()) / (torch.sum(seed_gt_votes_mask.float())+1e-6)
 
     # Compute the min of min of distance
