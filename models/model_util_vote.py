@@ -35,25 +35,86 @@ class VoteConfig(object):
         assert self.top_n_votes <= self.num_spatial_cls
 
 
-class VoteConfig_Discrete(object):
+class VoteConfig_Discrete_Polar(object):
     def __init__(self, 
-                 num_heading_bin=4,
-                 cut_points_r=(0.4, 1.2, 3.6),
-                 cut_points_z=(-1.0, 0.0, 1.0),
-                 fixed_votes_r=(0.2, 0.8, 2.4, 5.0),
-                 fixed_votes_z=(-1.5, -0.5, 0.5, 1.5), 
+                 num_heading_bin=8,
+                 fixed_votes_r=(0.25, 0.75, 1.5, 3.0),
+                 fixed_votes_z=(-0.75, -0.25, 0.25, 0.75), 
                  top_n_votes=3):
         
-        assert len(cut_points_r)+1 == len(fixed_votes_r)
-        assert len(cut_points_z)+1 == len(fixed_votes_z)
+        self.num_r_vote = len(fixed_votes_r)
+        self.num_z_vote = len(fixed_votes_z)
+        
         
         self.num_heading_bin = num_heading_bin
-        self.num_spatial_cls = self.num_heading_bin * len(fixed_votes_r) * len(fixed_votes_z)
+        self.num_spatial_cls = self.num_heading_bin * self.num_r_vote * self.num_z_vote
 
-        # TODO: compute fixed votes in xyz
-        self.fixed_votes = None # (num_spatial_cls, 3)
-        assert len(self.fixed_votes) == self.num_spatial_cls
+        # compute fixed votes in xyz
+        start_theta = torch.arange(self.num_heading_bin, dtype=torch.float32) * (2 * np.pi) / self.num_heading_bin
+        fixed_votes_r = torch.tensor(fixed_votes_r).view(1, -1)
+        fixed_votes_x = torch.cos(start_theta).view(-1, 1) * fixed_votes_r
+        fixed_votes_y = torch.sin(start_theta).view(-1, 1) * fixed_votes_r
+        fixed_votes_z = torch.tensor(fixed_votes_z).view(1, 1, -1, 1).repeat(self.num_heading_bin, self.num_r_vote, 1, 1)
+        self.fixed_votes = torch.cat((fixed_votes_x.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, self.num_z_vote, 1), 
+                                      fixed_votes_y.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, self.num_z_vote, 1),
+                                      fixed_votes_z), dim=3) # (num_heading_bin, num_r_vote, num_z_vote, 3)
+        self.fixed_votes = self.fixed_votes.view(-1, 3)
 
         self.top_n_votes = top_n_votes
 
         assert self.top_n_votes <= self.num_spatial_cls
+
+
+class VoteConfig_Discrete_Grid(object):
+    def __init__(self,
+                 fixed_votes_x=(-1.5, -0.75, -0.2, 0.2, 0.75, 1.5),
+                 fixed_votes_y=(-1.5, -0.75, -0.2, 0.2, 0.75, 1.5),
+                 fixed_votes_z=(-0.75, -0.25, 0.25, 0.75), 
+                 top_n_votes=3):
+
+        self.num_x_vote = len(fixed_votes_x)
+        self.num_y_vote = len(fixed_votes_y)
+        self.num_z_vote = len(fixed_votes_z)
+
+        self.num_spatial_cls = self.num_x_vote * self.num_y_vote * self.num_z_vote
+
+        # compute fixed votes in xyz
+        fixed_votes_x = torch.tensor(fixed_votes_x).view(-1, 1, 1, 1).repeat(1, self.num_y_vote, self.num_z_vote, 1)
+        fixed_votes_y = torch.tensor(fixed_votes_y).view(1, -1, 1, 1).repeat(self.num_x_vote, 1, self.num_z_vote, 1)
+        fixed_votes_z = torch.tensor(fixed_votes_z).view(1, 1, -1, 1).repeat(self.num_x_vote, self.num_y_vote, 1, 1)
+        self.fixed_votes = torch.cat((fixed_votes_x, fixed_votes_y, fixed_votes_z), dim=3) # (num_x_vote, num_y_vote, num_z_vote, 3)
+        self.fixed_votes = self.fixed_votes.view(-1, 3)
+
+        self.top_n_votes = top_n_votes
+
+        assert self.top_n_votes <= self.num_spatial_cls
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    vc1 = VoteConfig_Discrete_Polar()
+
+    fig1 = plt.figure(figsize=(10, 10))
+    ax1 = Axes3D(fig1)
+    ax1.scatter3D(vc1.fixed_votes[:, 0], vc1.fixed_votes[:, 1], vc1.fixed_votes[:, 2], s=5, depthshade= False)
+    ax1.set_xlim(-1.5, 1.5)
+    ax1.set_ylim(-1.5, 1.5)
+    ax1.set_zlim(-1.5, 1.5)
+    ax1.set_xlabel('x')
+    ax1.set_ylabel('y')
+    ax1.set_zlabel('z')
+
+    vc2 = VoteConfig_Discrete_Grid()
+
+    fig2 = plt.figure(figsize=(10, 10))
+    ax2 = Axes3D(fig2)
+    ax2.scatter3D(vc2.fixed_votes[:, 0], vc2.fixed_votes[:, 1], vc2.fixed_votes[:, 2], s=5, depthshade= False)
+    ax2.set_xlim(-1.5, 1.5)
+    ax2.set_ylim(-1.5, 1.5)
+    ax2.set_zlim(-1.5, 1.5)
+    ax2.set_xlabel('x')
+    ax2.set_ylabel('y')
+    ax2.set_zlabel('z')
+
+    plt.show()
