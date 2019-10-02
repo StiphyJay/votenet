@@ -139,6 +139,61 @@ class VotingModuleMulti(nn.Module):
         
         return vote_xyz.contiguous(), vote_features.contiguous(), vote_spatial_score.contiguous()
 
+
+class VotingModuleDiscrete(nn.Module):
+    def __init__(self, config, seed_feature_dim):
+        """ Votes generation from seed point features.
+
+        Args:
+            config: VoteConfig_Discrete
+                for testing different configs
+            seed_feature_dim: int
+                number of channels of seed point features
+        """
+        super().__init__()
+        self.config = config
+        self.num_spatial_cls = self.config.num_spatial_cls
+        self.in_dim = seed_feature_dim
+        
+        # TODO: layer parameter
+        self.out_vote_dim = self.in_dim + 1 # (feature) + score
+        self.conv1 = torch.nn.Conv1d(self.in_dim, self.in_dim, 1)
+        self.conv2 = torch.nn.Conv1d(self.in_dim, self.in_dim, 1)
+        self.conv3 = torch.nn.Conv1d(self.in_dim, self.num_spatial_cls*self.out_vote_dim, 1)
+        self.bn1 = torch.nn.BatchNorm1d(self.in_dim)
+        self.bn2 = torch.nn.BatchNorm1d(self.in_dim)
+        
+    def forward(self, seed_xyz, seed_features):
+        """ Forward pass.
+
+        Arguments:
+            seed_xyz: (batch_size, num_seed, 3) Pytorch tensor
+            seed_features: (batch_size, feature_dim, num_seed) Pytorch tensor
+
+        Returns: Note that for the convenience of choosing top n vote, return shape is different
+            vote_xyz: (batch_size, num_seed, num_spatial_cls, 3)
+            vote_features: (batch_size, num_seed, num_spatial_cls, vote_feature_dim)
+            vote_spatial_score: (batch_size, num_seed, num_spatial_cls)
+        """
+        batch_size = seed_xyz.shape[0]
+        num_seed = seed_xyz.shape[1]
+
+        net = F.relu(self.bn1(self.conv1(seed_features))) 
+        net = F.relu(self.bn2(self.conv2(net))) 
+        net = self.conv3(net) # (batch_size, num_spatial_cls*(3+out_dim+1), num_seed)
+                
+        net = net.transpose(2,1).view(batch_size, num_seed, self.num_spatial_cls, self.out_vote_dim)
+
+        fixed_votes = self.vote_config.fixed_votes.clone().to(seed_xyz.device) # (num_spatial_cls, 3)
+        vote_xyz = seed_xyz.unsqueeze(2) + fixed_votes.view(1, 1, -1, 3)
+
+        residual_features = net[:,:,:,:-1] # (batch_size, num_seed, num_spatial_cls, out_dim)
+        vote_features = seed_features.transpose(2,1).unsqueeze(2) + residual_features
+
+        vote_spatial_score = net[:,:,:,-1] # (batch_size, num_seed, num_spatial_cls)
+       
+        return vote_xyz.contiguous(), vote_features.contiguous(), vote_spatial_score.contiguous()
+
 # testing
 if __name__=='__main__':
     net = VotingModule(2, 256).cuda()
