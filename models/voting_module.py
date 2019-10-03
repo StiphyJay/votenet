@@ -184,7 +184,7 @@ class VotingModuleDiscrete(nn.Module):
                 
         net = net.transpose(2,1).view(batch_size, num_seed, self.num_spatial_cls, self.out_vote_dim)
 
-        fixed_votes = self.vote_config.fixed_votes.clone().to(seed_xyz.device) # (num_spatial_cls, 3)
+        fixed_votes = self.config.fixed_votes.clone().to(seed_xyz.device) # (num_spatial_cls, 3)
         vote_xyz = seed_xyz.unsqueeze(2) + fixed_votes.view(1, 1, -1, 3)
 
         residual_features = net[:,:,:,:-1] # (batch_size, num_seed, num_spatial_cls, out_dim)

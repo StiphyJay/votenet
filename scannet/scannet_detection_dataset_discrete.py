@@ -28,7 +28,7 @@ DC = ScannetDatasetConfig()
 MAX_NUM_OBJ = 64
 MEAN_COLOR_RGB = np.array([109.8, 97.2, 83.8])
 
-class ScannetDetectionDatasetMulti(Dataset):
+class ScannetDetectionDatasetDiscrete(Dataset):
        
     def __init__(self, split_set='train', num_points=20000,
         use_color=False, use_height=False, augment=False, vote_config=VoteConfig_Discrete_Grid()):
@@ -154,9 +154,9 @@ class ScannetDetectionDatasetMulti(Dataset):
         
         # add spatial label
         fixed_votes = self.vote_config.fixed_votes.unsqueeze(0) # (1, num_spatial_cls, 3)
-        point_votes_torch = torch.from_numpy(point_votes).unsqueeze(0) # (1, num_points, 3)
+        point_votes_torch = torch.from_numpy(point_votes.astype(np.float32)).unsqueeze(0) # (1, num_points, 3)
         _, vote_spatial_label, _, _ = nn_distance(point_votes_torch, fixed_votes)
-        vote_spatial_label = vote_spatial_label.squeeze().numpy()
+        vote_spatial_label = vote_spatial_label.squeeze(0).numpy() # (num_points)
 
         
         class_ind = [np.where(DC.nyu40ids == x)[0][0] for x in instance_bboxes[:,-1]]   
