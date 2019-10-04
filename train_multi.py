@@ -68,6 +68,7 @@ parser.add_argument('--dump_results', action='store_true', help='Dump results.')
 
 parser.add_argument('--num_heading_bin', type=int, required=True, help='num_heading_bin for spatial discrete')
 parser.add_argument('--top_n_votes', type=int, required=True, help='Top n votes')
+parser.add_argument('--best_n_votes', type=int, required=True, help='Best n votes')
 parser.add_argument('--vote_cls_loss_weight', type=float, required=True, help='vote_cls_loss_weight')
 parser.add_argument('--vote_cls_loss_weight_decay', default=False, action='store_true', help='enable vote_cls_loss_weight_decay')
 parser.add_argument('--vote_cls_loss_weight_decay_steps', default=None, type=str, help='vote_cls_loss_weight_decay_steps')
@@ -128,7 +129,8 @@ def my_worker_init_fn(worker_id):
 
 # Construct vote config
 VC = VoteConfig(num_heading_bin=FLAGS.num_heading_bin,
-                top_n_votes=FLAGS.top_n_votes)
+                top_n_votes=FLAGS.top_n_votes,
+                best_n_votes=FLAGS.best_n_votes)
 
 # Create Dataset and Dataloader
 if FLAGS.dataset == 'sunrgbd':

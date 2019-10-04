@@ -159,7 +159,8 @@ class ProposalModuleMulti(nn.Module):
         Returns:
             scores: (B,num_proposal,2+3+NH*2+NS*4) 
         """
-        num_spatial_cls = self.vote_config.num_spatial_cls
+        batch_size = end_points['seed_xyz'].shape[0]
+        num_seed = end_points['seed_xyz'].shape[1]
 
         if self.sampling == 'vote_fps':
             # Farthest point sampling (FPS) on votes
@@ -176,12 +177,21 @@ class ProposalModuleMulti(nn.Module):
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
         elif self.sampling == 'random':
             # Random sampling from the votes
-            batch_size = end_points['seed_xyz'].shape[0]
-            num_seed = end_points['seed_xyz'].shape[1]
             sample_inds = torch.randint(0, num_seed, (batch_size, self.num_seed_fps), dtype=torch.int).cuda()
             sample_inds *= self.num_vote
             sample_inds = torch.cat([(sample_inds + i) for i in range(self.num_vote)], dim=1)
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
+        elif self.sampling == 'sorted_fps':
+            vote_spatial_score_top_n = end_points['vote_spatial_score_top_n'] # (batch_size, num_seed*num_vote)
+            #_, vote_best_n_ind = torch.sort(vote_spatial_score_top_n, dim=1, descending=True)
+            #vote_best_n_ind = vote_best_n_ind[:, :self.vote_config.best_n_votes]
+            _, vote_best_n_ind = torch.topk(vote_spatial_score_top_n, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
+            vote_best_n_ind_expand = vote_best_n_ind.unsqueeze(-1).repeat(1,1,3)
+            new_vote_xyz = torch.gather(xyz, 1, vote_best_n_ind_expand).contiguous()
+            vote_best_n_ind_expand = vote_best_n_ind.unsqueeze(1).repeat(1,features.size(1),1)
+            new_vote_features = torch.gather(features, 2, vote_best_n_ind_expand).contiguous()
+            xyz, features, fps_inds = self.vote_aggregation(new_vote_xyz, new_vote_features)
+            sample_inds = fps_inds
         else:
             log_string('Unknown sampling strategy: %s. Exiting!'%(self.sampling))
             exit()

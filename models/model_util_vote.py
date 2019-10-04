@@ -17,7 +17,8 @@ class VoteConfig(object):
                  max_z=1.6,
                  parse_r=F.relu,
                  parse_z=F.relu,
-                 top_n_votes=3):
+                 top_n_votes=3,
+                 best_n_votes=768):
         
         self.num_heading_bin = num_heading_bin
         self.num_spatial_cls = self.num_heading_bin * 2
@@ -31,6 +32,7 @@ class VoteConfig(object):
         self.parse_z = parse_z
 
         self.top_n_votes = top_n_votes
+        self.best_n_votes = best_n_votes
 
         assert self.top_n_votes <= self.num_spatial_cls
 
@@ -40,7 +42,8 @@ class VoteConfig_Discrete_Polar(object):
                  num_heading_bin=8,
                  fixed_votes_r=(0.25, 0.75, 1.5, 3.0),
                  fixed_votes_z=(-0.75, -0.25, 0.25, 0.75), 
-                 top_n_votes=3):
+                 top_n_votes=3,
+                 best_n_votes=768):
         
         self.num_r_vote = len(fixed_votes_r)
         self.num_z_vote = len(fixed_votes_z)
@@ -61,6 +64,7 @@ class VoteConfig_Discrete_Polar(object):
         self.fixed_votes = self.fixed_votes.view(-1, 3)
 
         self.top_n_votes = top_n_votes
+        self.best_n_votes = best_n_votes
 
         assert self.top_n_votes <= self.num_spatial_cls
 
@@ -70,7 +74,8 @@ class VoteConfig_Discrete_Grid(object):
                  fixed_votes_x=(-1.5, -0.75, -0.2, 0.2, 0.75, 1.5),
                  fixed_votes_y=(-1.5, -0.75, -0.2, 0.2, 0.75, 1.5),
                  fixed_votes_z=(-0.75, -0.25, 0.25, 0.75), 
-                 top_n_votes=3):
+                 top_n_votes=3,
+                 best_n_votes=768):
 
         self.num_x_vote = len(fixed_votes_x)
         self.num_y_vote = len(fixed_votes_y)
@@ -86,6 +91,7 @@ class VoteConfig_Discrete_Grid(object):
         self.fixed_votes = self.fixed_votes.view(-1, 3)
 
         self.top_n_votes = top_n_votes
+        self.best_n_votes = best_n_votes
 
         assert self.top_n_votes <= self.num_spatial_cls
 

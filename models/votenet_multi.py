@@ -102,7 +102,7 @@ class VoteNetMulti(nn.Module):
 
         # choose top_n_votes
         num_vote = self.vote_config.top_n_votes
-        _, top_n_spatial_score_ind = torch.topk(spatial_score, num_vote, dim=2)
+        top_n_spatial_score, top_n_spatial_score_ind = torch.topk(spatial_score, num_vote, dim=2) # (batch_size, num_seed, num_vote)
         top_n_spatial_score_ind_expand = top_n_spatial_score_ind.unsqueeze(-1).repeat(1,1,1,3)
         xyz_top_n = torch.gather(xyz, 2, top_n_spatial_score_ind_expand) # (batch_size, num_seed, num_vote, 3)
         vote_feature_dim = features.size(-1)
@@ -114,6 +114,7 @@ class VoteNetMulti(nn.Module):
 
         end_points['vote_xyz'] = xyz_top_n_reshape # (batch_size, num_seed*num_spatial_cls, 3)
         end_points['vote_features'] = features_top_n_reshape # (batch_size, vote_feature_dim, num_seed*num_vote)
+        end_points['vote_spatial_score_top_n'] = top_n_spatial_score.view(batch_size, -1).contiguous() # (batch_size, num_seed*num_vote)
 
         end_points = self.pnet(xyz_top_n_reshape, features_top_n_reshape, end_points)
 
