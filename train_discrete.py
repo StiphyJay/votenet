@@ -332,7 +332,8 @@ def evaluate_one_epoch():
         
         # Forward pass
         inputs = {'point_clouds': batch_data_label['point_clouds']}
-        end_points = net(inputs)
+        with torch.no_grad():
+            end_points = net(inputs)
 
         # add vote_cls_loss_weight to end_points
         end_points['vote_cls_loss_weight'] = vote_cls_loss_weight
