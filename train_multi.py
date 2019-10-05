@@ -166,7 +166,8 @@ else:
     exit(-1)
 print(len(TRAIN_DATASET), len(TEST_DATASET))
 TRAIN_DATALOADER = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE,
-    shuffle=True, num_workers=FLAGS.num_workers, worker_init_fn=my_worker_init_fn)
+    shuffle=True, num_workers=FLAGS.num_workers, worker_init_fn=my_worker_init_fn,
+    drop_last=True)
 TEST_DATALOADER = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE,
     shuffle=True, num_workers=FLAGS.num_workers, worker_init_fn=my_worker_init_fn)
 print(len(TRAIN_DATALOADER), len(TEST_DATALOADER))
@@ -345,14 +346,26 @@ def evaluate_one_epoch():
     for key in metrics_dict:
         log_string('eval %s: %f'%(key, metrics_dict[key]))
 
+    # save best model according to mAP
+    if metrics_dict['mAP'] > BEST_MAP:
+        BEST_MAP = metrics_dict['mAP']
+        save_dict = {'epoch': EPOCH_CNT+1, # after training one epoch, the start_epoch should be epoch+1
+                     'mAP': BEST_MAP,
+                    }
+        try: 
+            save_dict['model_state_dict'] = net.module.state_dict()
+        except:
+            save_dict['model_state_dict'] = net.state_dict()
+        torch.save(save_dict, os.path.join(LOG_DIR, 'best_eval_model.tar'))
+
     mean_loss = stat_dict['loss']/float(batch_idx+1)
     return mean_loss
 
 
 def train(start_epoch):
     global EPOCH_CNT 
-    min_loss = 1e10
-    loss = 0
+    global BEST_MAP
+    BEST_MAP = 0.0
     for epoch in range(start_epoch, MAX_EPOCH):
         EPOCH_CNT = epoch
         log_string('**** EPOCH %03d ****' % (epoch))
