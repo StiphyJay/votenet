@@ -347,6 +347,7 @@ def evaluate_one_epoch():
         log_string('eval %s: %f'%(key, metrics_dict[key]))
 
     # save best model according to mAP
+    global BEST_MAP
     if metrics_dict['mAP'] > BEST_MAP:
         BEST_MAP = metrics_dict['mAP']
         save_dict = {'epoch': EPOCH_CNT+1, # after training one epoch, the start_epoch should be epoch+1
