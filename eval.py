@@ -14,6 +14,7 @@ import argparse
 import importlib
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,6 +44,10 @@ parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU thresho
 parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
 parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
 parser.add_argument('--shuffle_dataset', action='store_true', help='Shuffle the dataset (random order).')
+
+parser.add_argument('--compute_false_stat', action='store_true', help='compute_false_stat.')
+parser.add_argument('--obj_pos_prob', type=float, default=0.5, help='obj_pos_prob')
+parser.add_argument('--obj_neg_prob', type=float, default=0.5, help='obj_neg_prob')
 FLAGS = parser.parse_args()
 
 if FLAGS.use_cls_nms:
@@ -133,6 +138,9 @@ CONFIG_DICT = {'remove_empty_box': (not FLAGS.faster_eval), 'use_3d_nms': FLAGS.
 
 def evaluate_one_epoch():
     stat_dict = {}
+    if FLAGS.compute_false_stat:
+        stat_dict['objectness_fp_rate'] = 0.0
+        stat_dict['objectness_fn_rate'] = 0.0
     ap_calculator_list = [APCalculator(iou_thresh, DATASET_CONFIG.class2type) \
         for iou_thresh in AP_IOU_THRESHOLDS]
     net.eval() # set model to eval mode (for bn and dp)
@@ -152,6 +160,18 @@ def evaluate_one_epoch():
             assert(key not in end_points)
             end_points[key] = batch_data_label[key]
         loss, end_points = criterion(end_points, DATASET_CONFIG)
+
+        if FLAGS.compute_false_stat:
+            objectness_scores = end_points['objectness_scores']
+            objectness_prob = F.softmax(objectness_scores, dim=2)[:, :, 1] # (B, num_proposal)
+            objectness_pos_mask = (objectness_prob > FLAGS.obj_pos_prob).long()
+            objectness_neg_mask = (objectness_prob < FLAGS.obj_neg_prob).long()
+            objectness_label_pos_mask = end_points['objectness_label']
+            objectness_label_neg_mask = end_points['objectness_mask'] - end_points['objectness_label']
+            objectness_fp_rate = 1.0 - float((objectness_pos_mask*objectness_label_pos_mask).sum().item()) / float(objectness_pos_mask.sum().item())
+            objectness_fn_rate = 1.0 - float((objectness_neg_mask*objectness_label_neg_mask).sum().item()) / float(objectness_neg_mask.sum().item())
+            stat_dict['objectness_fp_rate'] += objectness_fp_rate
+            stat_dict['objectness_fn_rate'] += objectness_fn_rate
 
         # Accumulate statistics and print out
         for key in end_points:
