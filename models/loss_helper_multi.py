@@ -55,6 +55,12 @@ def compute_vote_loss(end_points):
     seed_gt_votes = torch.gather(end_points['vote_label'], 1, seed_inds_expand)
     seed_gt_votes += end_points['seed_xyz']
 
+    # Compute num_valid_vote per positive seed
+    num_vote = vote_xyz.size(1) / num_seed
+    vote_best_n_seed_inds = end_points['vote_best_n_inds'] / num_vote
+    vote_best_n_mask = torch.gather(seed_gt_votes_mask, 1, vote_best_n_seed_inds)
+    end_points['pos_seed_vote_ratio'] = torch.sum(vote_best_n_mask).float() / torch.sum(seed_gt_votes_mask).float()
+
     # spatial class loss
     vote_spatial_score_reshape = end_points['vote_spatial_score'].transpose(1, 2).contiguous() # (batch_size, num_spatial_cls, num_seed)
     seed_gt_votes_cls = torch.gather(end_points['vote_label_cls'], 1, seed_inds) # (batch_size, num_seed)
