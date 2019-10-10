@@ -14,6 +14,7 @@ import argparse
 import importlib
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,7 @@ from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', default='votenet_multi', help='Model file name [default: votenet_multi]')
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
+parser.add_argument('--split', default='val', help='Dataset split. train or val. [default: val]')
 parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for dataloader. [default: 4]')
 parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
 parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
@@ -53,6 +55,10 @@ parser.add_argument('--vote_cls_loss_weight', type=float, required=True, help='v
 parser.add_argument('--vote_cls_loss_weight_decay', default=False, action='store_true', help='enable vote_cls_loss_weight_decay')
 parser.add_argument('--vote_cls_loss_weight_decay_steps', default=None, type=str, help='vote_cls_loss_weight_decay_steps')
 parser.add_argument('--vote_cls_loss_weight_decay_rates', default=None, type=str, help='vote_cls_loss_weight_decay_rates')
+
+parser.add_argument('--compute_false_stat', action='store_true', help='compute_false_stat.')
+parser.add_argument('--obj_pos_prob', type=float, default=0.5, help='obj_pos_prob')
+parser.add_argument('--obj_neg_prob', type=float, default=0.5, help='obj_neg_prob')
 FLAGS = parser.parse_args()
 
 if FLAGS.use_cls_nms:
@@ -106,7 +112,7 @@ if FLAGS.dataset == 'sunrgbd':
     from sunrgbd_detection_dataset_multi import SunrgbdDetectionVotesDatasetMulti, MAX_NUM_OBJ
     from model_util_sunrgbd import SunrgbdDatasetConfig
     DATASET_CONFIG = SunrgbdDatasetConfig()
-    TEST_DATASET = SunrgbdDetectionVotesDatasetMulti('val', num_points=NUM_POINT,
+    TEST_DATASET = SunrgbdDetectionVotesDatasetMulti(FLAGS.split, num_points=NUM_POINT,
         augment=False, use_color=FLAGS.use_color, use_height=(not FLAGS.no_height),
         use_v1=(not FLAGS.use_sunrgbd_v2),
         vote_config=VC)
@@ -115,7 +121,7 @@ elif FLAGS.dataset == 'scannet':
     from scannet_detection_dataset_multi import ScannetDetectionDatasetMulti, MAX_NUM_OBJ
     from model_util_scannet import ScannetDatasetConfig
     DATASET_CONFIG = ScannetDatasetConfig()
-    TEST_DATASET = ScannetDetectionDatasetMulti('val', num_points=NUM_POINT,
+    TEST_DATASET = ScannetDetectionDatasetMulti(FLAGS.split, num_points=NUM_POINT,
         augment=False,
         use_color=FLAGS.use_color, use_height=(not FLAGS.no_height),
         vote_config=VC)
@@ -165,6 +171,23 @@ CONFIG_DICT = {'remove_empty_box': (not FLAGS.faster_eval), 'use_3d_nms': FLAGS.
 
 def evaluate_one_epoch():
     stat_dict = {}
+    if FLAGS.compute_false_stat:
+        stat_dict['objectness_total_gt_pos'] = 0.0
+        stat_dict['objectness_total_gt_neg'] = 0.0
+        stat_dict['objectness_total_det_pos'] = 0.0
+        stat_dict['objectness_total_det_neg'] = 0.0
+        stat_dict['objectness_total_tp'] = 0.0
+        stat_dict['objectness_total_tn'] = 0.0
+        stat_dict['objectness_total_fp'] = 0.0
+        stat_dict['objectness_total_fn'] = 0.0
+        stat_dict['objectness_pos_prec'] = 0.0
+        stat_dict['objectness_pos_rec'] = 0.0
+        stat_dict['objectness_neg_prec'] = 0.0
+        stat_dict['objectness_neg_rec'] = 0.0
+        stat_dict['objectness_pos_err_rate'] = 0.0
+        stat_dict['objectness_fp_rate'] = 0.0
+        stat_dict['objectness_neg_err_rate'] = 0.0
+        stat_dict['objectness_fn_rate'] = 0.0
     ap_calculator_list = [APCalculator(iou_thresh, DATASET_CONFIG.class2type) \
         for iou_thresh in AP_IOU_THRESHOLDS]
     vote_cls_loss_weight = get_current_vote_cls_loss_weight(epoch)
@@ -188,6 +211,43 @@ def evaluate_one_epoch():
             assert(key not in end_points)
             end_points[key] = batch_data_label[key]
         loss, end_points = criterion(end_points, DATASET_CONFIG)
+
+        if FLAGS.compute_false_stat:
+            batch_size = float(end_points['objectness_scores'].size(0))
+            objectness_scores = end_points['objectness_scores']
+            objectness_prob = F.softmax(objectness_scores, dim=2)[:, :, 1] # (B, num_proposal)
+            objectness_det_pos_mask = (objectness_prob > FLAGS.obj_pos_prob).long()
+            objectness_det_neg_mask = (objectness_prob < FLAGS.obj_neg_prob).long()
+            objectness_gt_pos_mask = end_points['objectness_label']
+            objectness_gt_neg_mask = end_points['objectness_mask'].long() - end_points['objectness_label']
+            cur_total_gt_pos = objectness_gt_pos_mask.sum().float().item()
+            cur_total_gt_neg = objectness_gt_neg_mask.sum().float().item()
+            cur_total_det_pos = objectness_det_pos_mask.sum().float().item()
+            cur_total_det_neg = objectness_det_neg_mask.sum().float().item()
+            cur_tp_mask = objectness_det_pos_mask*objectness_gt_pos_mask
+            cur_tn_mask = objectness_det_neg_mask*objectness_gt_neg_mask
+            cur_fp_mask = objectness_det_pos_mask*objectness_gt_neg_mask
+            cur_fn_mask = objectness_det_neg_mask*objectness_gt_pos_mask
+            cur_total_tp = cur_tp_mask.sum().float().item()
+            cur_total_tn = cur_tn_mask.sum().float().item()
+            cur_total_fp = cur_fp_mask.sum().float().item()
+            cur_total_fn = cur_fn_mask.sum().float().item()
+            stat_dict['objectness_total_gt_pos'] += cur_total_gt_pos / batch_size
+            stat_dict['objectness_total_gt_neg'] += cur_total_gt_neg / batch_size
+            stat_dict['objectness_total_det_pos'] += cur_total_det_pos / batch_size
+            stat_dict['objectness_total_det_neg'] += cur_total_det_neg / batch_size
+            stat_dict['objectness_total_tp'] += cur_total_tp / batch_size
+            stat_dict['objectness_total_tn'] += cur_total_tn / batch_size
+            stat_dict['objectness_total_fp'] += cur_total_fp / batch_size
+            stat_dict['objectness_total_fn'] += cur_total_fn / batch_size
+            stat_dict['objectness_pos_prec'] += cur_total_tp / cur_total_det_pos
+            stat_dict['objectness_pos_rec'] += cur_total_tp / cur_total_gt_pos
+            stat_dict['objectness_neg_prec'] += cur_total_tn / cur_total_det_neg
+            stat_dict['objectness_neg_rec'] += cur_total_tn / cur_total_gt_neg
+            stat_dict['objectness_pos_err_rate'] += cur_total_fp / cur_total_det_pos
+            stat_dict['objectness_fp_rate'] += cur_total_fp / cur_total_gt_neg
+            stat_dict['objectness_neg_err_rate'] += cur_total_fn / cur_total_det_neg
+            stat_dict['objectness_fn_rate'] += cur_total_fn / cur_total_gt_pos
 
         # Accumulate statistics and print out
         for key in end_points:

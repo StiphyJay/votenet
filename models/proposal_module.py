@@ -192,6 +192,16 @@ class ProposalModuleMulti(nn.Module):
             new_vote_features = torch.gather(features, 2, vote_best_n_ind_expand).contiguous()
             xyz, features, fps_inds = self.vote_aggregation(new_vote_xyz, new_vote_features)
             sample_inds = fps_inds
+        elif self.sampling == 'sorted_random':
+            vote_spatial_score_top_n = end_points['vote_spatial_score_top_n'] # (batch_size, num_seed*num_vote)
+            _, vote_best_n_ind = torch.topk(vote_spatial_score_top_n, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
+            vote_best_n_ind_expand = vote_best_n_ind.unsqueeze(-1).repeat(1,1,3)
+            new_vote_xyz = torch.gather(xyz, 1, vote_best_n_ind_expand).contiguous()
+            vote_best_n_ind_expand = vote_best_n_ind.unsqueeze(1).repeat(1,features.size(1),1)
+            new_vote_features = torch.gather(features, 2, vote_best_n_ind_expand).contiguous()
+
+            sample_inds = torch.randint(0, self.vote_config.best_n_votes, (batch_size, self.num_proposal), dtype=torch.int).cuda()
+            xyz, features, _ = self.vote_aggregation(new_vote_xyz, new_vote_features, sample_inds)
         else:
             log_string('Unknown sampling strategy: %s. Exiting!'%(self.sampling))
             exit()
