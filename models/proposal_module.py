@@ -186,6 +186,7 @@ class ProposalModuleMulti(nn.Module):
             end_points['vote_best_n_inds'] = vote_best_n_inds
             vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(-1).repeat(1,1,3)
             new_vote_xyz = torch.gather(xyz, 1, vote_best_n_inds_expand).contiguous()
+            end_points['vote_best_n_xyz'] = new_vote_xyz
             vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(1).repeat(1,features.size(1),1)
             new_vote_features = torch.gather(features, 2, vote_best_n_inds_expand).contiguous()
             xyz, features, fps_inds = self.vote_aggregation(new_vote_xyz, new_vote_features)
@@ -196,6 +197,7 @@ class ProposalModuleMulti(nn.Module):
             end_points['vote_best_n_inds'] = vote_best_n_inds
             vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(-1).repeat(1,1,3)
             new_vote_xyz = torch.gather(xyz, 1, vote_best_n_inds_expand).contiguous()
+            end_points['vote_best_n_xyz'] = new_vote_xyz
             vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(1).repeat(1,features.size(1),1)
             new_vote_features = torch.gather(features, 2, vote_best_n_inds_expand).contiguous()
 
