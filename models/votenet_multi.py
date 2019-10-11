@@ -103,22 +103,15 @@ class VoteNetMulti(nn.Module):
         features_norm = torch.norm(features, p=2, dim=1)
         features = features.div(features_norm.unsqueeze(1))
         end_points['vote_spatial_score'] = spatial_score # (batch_size, num_seed, num_spatial_cls)
+        vote_sorted_key = F.softmax(spatial_score, dim=2) if self.sorted_by_prob else spatial_score
 
         if self.disable_top_n_votes:
-            xyz_reshape = xyz.view(batch_size, -1, 3).contiguous()
-            features_reshape = features.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous() 
-            end_points['vote_xyz'] = xyz_reshape
-            end_points['vote_features'] = features_reshape
-            vote_sorted_key = F.softmax(spatial_score, dim=2) if self.sorted_by_prob else spatial_score
+            end_points['vote_xyz'] = xyz.view(batch_size, -1, 3).contiguous()
+            end_points['vote_features'] = features.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous()
             end_points['vote_sorted_key'] = vote_sorted_key.view(batch_size, -1).contiguous()
-            end_points = self.pnet(xyz_reshape, features_reshape, end_points)
         else:
             # choose top_n_votes
-            num_vote = self.vote_config.top_n_votes
-            if self.sorted_by_prob:
-                top_n_sorted_key, top_n_spatial_ind = torch.topk(spatial_score, num_vote, dim=2) # (batch_size, num_seed, num_vote)
-            else:
-                top_n_sorted_key, top_n_spatial_ind = torch.topk(F.softmax(spatial_score, dim=2), num_vote, dim=2)
+            top_n_sorted_key, top_n_spatial_ind = torch.topk(vote_sorted_key, self.vote_config.top_n_votes, dim=2) # (batch_size, num_seed, num_vote)
             top_n_spatial_ind_expand = top_n_spatial_ind.unsqueeze(-1).repeat(1,1,1,3)
             xyz_top_n = torch.gather(xyz, 2, top_n_spatial_ind_expand) # (batch_size, num_seed, num_vote, 3)
             top_n_spatial_ind_expand = top_n_spatial_ind.unsqueeze(-1).repeat(1,1,1,vote_feature_dim)
@@ -130,7 +123,8 @@ class VoteNetMulti(nn.Module):
             end_points['vote_xyz'] = xyz_top_n_reshape # (batch_size, num_seed*num_vote, 3)
             end_points['vote_features'] = features_top_n_reshape # (batch_size, vote_feature_dim, num_seed*num_vote)
             end_points['vote_sorted_key'] = top_n_sorted_key.view(batch_size, -1).contiguous() # (batch_size, num_seed*num_vote)
-            end_points = self.pnet(xyz_top_n_reshape, features_top_n_reshape, end_points)
+            
+        end_points = self.pnet(end_points['vote_xyz'], end_points['vote_features'], end_points)
 
         return end_points
 
