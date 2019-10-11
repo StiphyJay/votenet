@@ -67,8 +67,10 @@ parser.add_argument('--overwrite', action='store_true', help='Overwrite existing
 parser.add_argument('--dump_results', action='store_true', help='Dump results.')
 
 parser.add_argument('--num_heading_bin', type=int, required=True, help='num_heading_bin for spatial discrete')
+parser.add_argument('--disable_top_n_votes', action='store_true', help='Dump disable_top_n_votes.')
 parser.add_argument('--top_n_votes', type=int, required=True, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, required=True, help='Best n votes')
+parser.add_argument('--sorted_by_prob', action='store_true', help='Dump disable_top_n_votes.')
 parser.add_argument('--vote_cls_loss_weight', type=float, required=True, help='vote_cls_loss_weight')
 parser.add_argument('--vote_cls_loss_weight_decay', default=False, action='store_true', help='enable vote_cls_loss_weight_decay')
 parser.add_argument('--vote_cls_loss_weight_decay_steps', default=None, type=str, help='vote_cls_loss_weight_decay_steps')
@@ -191,7 +193,9 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                num_proposal=FLAGS.num_target,
                input_feature_dim=num_input_channel,
                vote_config=VC,
-               sampling=FLAGS.cluster_sampling)
+               sampling=FLAGS.cluster_sampling,
+               disable_top_n_votes=FLAGS.disable_top_n_votes,
+               sorted_by_prob=FLAGS.sorted_by_prob)
 
 if torch.cuda.device_count() > 1:
   log_string("Let's use %d GPUs!" % (torch.cuda.device_count()))

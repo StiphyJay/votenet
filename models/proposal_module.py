@@ -181,8 +181,8 @@ class ProposalModuleMulti(nn.Module):
             sample_inds = torch.cat([(sample_inds + i) for i in range(self.num_vote)], dim=1)
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
         elif self.sampling == 'sorted_fps':
-            vote_spatial_score_top_n = end_points['vote_spatial_score_top_n'] # (batch_size, num_seed*num_vote)
-            _, vote_best_n_inds = torch.topk(vote_spatial_score_top_n, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
+            vote_sorted_key = end_points['vote_sorted_key'] # (batch_size, num_seed*num_vote)
+            _, vote_best_n_inds = torch.topk(vote_sorted_key, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
             end_points['vote_best_n_inds'] = vote_best_n_inds
             vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(-1).repeat(1,1,3)
             new_vote_xyz = torch.gather(xyz, 1, vote_best_n_inds_expand).contiguous()
@@ -191,8 +191,8 @@ class ProposalModuleMulti(nn.Module):
             xyz, features, fps_inds = self.vote_aggregation(new_vote_xyz, new_vote_features)
             sample_inds = fps_inds
         elif self.sampling == 'sorted_random':
-            vote_spatial_score_top_n = end_points['vote_spatial_score_top_n'] # (batch_size, num_seed*num_vote)
-            _, vote_best_n_inds = torch.topk(vote_spatial_score_top_n, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
+            vote_sorted_key = end_points['vote_sorted_key'] # (batch_size, num_seed*num_vote)
+            _, vote_best_n_inds = torch.topk(vote_sorted_key, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
             end_points['vote_best_n_inds'] = vote_best_n_inds
             vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(-1).repeat(1,1,3)
             new_vote_xyz = torch.gather(xyz, 1, vote_best_n_inds_expand).contiguous()

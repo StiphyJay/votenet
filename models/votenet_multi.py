@@ -10,6 +10,7 @@ Author: Charles R. Qi and Or Litany
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import sys
 import os
@@ -44,7 +45,7 @@ class VoteNetMulti(nn.Module):
 
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
                  input_feature_dim=0, num_proposal=128, vote_config=VoteConfig(), 
-                 sampling='vote_fps'):
+                 sampling='vote_fps', disable_top_n_votes=False, sorted_by_prob=False):
         super().__init__()
 
         self.num_class = num_class
@@ -56,6 +57,8 @@ class VoteNetMulti(nn.Module):
         self.num_proposal = num_proposal
         self.vote_config = vote_config
         self.sampling=sampling
+        self.disable_top_n_votes = disable_top_n_votes
+        self.sorted_by_prob = sorted_by_prob
 
         # Backbone point feature learning
         self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
@@ -96,27 +99,38 @@ class VoteNetMulti(nn.Module):
         end_points['seed_features'] = features
         
         xyz, features, spatial_score = self.vgen(xyz, features)
+        vote_feature_dim = features.size(-1)
         features_norm = torch.norm(features, p=2, dim=1)
         features = features.div(features_norm.unsqueeze(1))
         end_points['vote_spatial_score'] = spatial_score # (batch_size, num_seed, num_spatial_cls)
 
-        # choose top_n_votes
-        num_vote = self.vote_config.top_n_votes
-        top_n_spatial_score, top_n_spatial_score_ind = torch.topk(spatial_score, num_vote, dim=2) # (batch_size, num_seed, num_vote)
-        top_n_spatial_score_ind_expand = top_n_spatial_score_ind.unsqueeze(-1).repeat(1,1,1,3)
-        xyz_top_n = torch.gather(xyz, 2, top_n_spatial_score_ind_expand) # (batch_size, num_seed, num_vote, 3)
-        vote_feature_dim = features.size(-1)
-        top_n_spatial_score_ind_expand = top_n_spatial_score_ind.unsqueeze(-1).repeat(1,1,1,vote_feature_dim)
-        features_top_n = torch.gather(features, 2, top_n_spatial_score_ind_expand) # (batch_size, num_seed, num_vote, vote_feature_dim)
+        if self.disable_top_n_votes:
+            xyz_reshape = xyz.view(batch_size, -1, 3).contiguous()
+            features_reshape = features.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous() 
+            end_points['vote_xyz'] = xyz_reshape
+            end_points['vote_features'] = features_reshape
+            vote_sorted_key = F.softmax(spatial_score, dim=2) if self.sorted_by_prob else spatial_score
+            end_points['vote_sorted_key'] = vote_sorted_key.view(batch_size, -1).contiguous()
+            end_points = self.pnet(xyz_reshape, features_reshape, end_points)
+        else:
+            # choose top_n_votes
+            num_vote = self.vote_config.top_n_votes
+            if self.sorted_by_prob:
+                top_n_sorted_key, top_n_spatial_ind = torch.topk(spatial_score, num_vote, dim=2) # (batch_size, num_seed, num_vote)
+            else:
+                top_n_sorted_key, top_n_spatial_ind = torch.topk(F.softmax(spatial_score, dim=2), num_vote, dim=2)
+            top_n_spatial_ind_expand = top_n_spatial_ind.unsqueeze(-1).repeat(1,1,1,3)
+            xyz_top_n = torch.gather(xyz, 2, top_n_spatial_ind_expand) # (batch_size, num_seed, num_vote, 3)
+            top_n_spatial_ind_expand = top_n_spatial_ind.unsqueeze(-1).repeat(1,1,1,vote_feature_dim)
+            features_top_n = torch.gather(features, 2, top_n_spatial_ind_expand) # (batch_size, num_seed, num_vote, vote_feature_dim)
 
-        xyz_top_n_reshape = xyz_top_n.view(batch_size, -1, 3).contiguous() # (batch_size, num_seed*num_vote, 3)
-        features_top_n_reshape = features_top_n.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous() # (batch_size, vote_feature_dim, num_seed*num_vote)
+            xyz_top_n_reshape = xyz_top_n.view(batch_size, -1, 3).contiguous() # (batch_size, num_seed*num_vote, 3)
+            features_top_n_reshape = features_top_n.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous() # (batch_size, vote_feature_dim, num_seed*num_vote)
 
-        end_points['vote_xyz'] = xyz_top_n_reshape # (batch_size, num_seed*num_vote, 3)
-        end_points['vote_features'] = features_top_n_reshape # (batch_size, vote_feature_dim, num_seed*num_vote)
-        end_points['vote_spatial_score_top_n'] = top_n_spatial_score.view(batch_size, -1).contiguous() # (batch_size, num_seed*num_vote)
-
-        end_points = self.pnet(xyz_top_n_reshape, features_top_n_reshape, end_points)
+            end_points['vote_xyz'] = xyz_top_n_reshape # (batch_size, num_seed*num_vote, 3)
+            end_points['vote_features'] = features_top_n_reshape # (batch_size, vote_feature_dim, num_seed*num_vote)
+            end_points['vote_sorted_key'] = top_n_sorted_key.view(batch_size, -1).contiguous() # (batch_size, num_seed*num_vote)
+            end_points = self.pnet(xyz_top_n_reshape, features_top_n_reshape, end_points)
 
         return end_points
 
