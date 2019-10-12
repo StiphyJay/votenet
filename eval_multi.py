@@ -27,14 +27,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', default='votenet_multi', help='Model file name [default: votenet_multi]')
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
 parser.add_argument('--split', default='val', help='Dataset split. train or val. [default: val]')
-parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for dataloader. [default: 4]')
+parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader. [default: 4]')
 parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
 parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
 parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
 parser.add_argument('--num_target', type=int, default=256, help='Point Number [default: 256]')
 parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
 parser.add_argument('--vote_factor', type=int, default=1, help='Number of votes generated from each seed [default: 1]')
-parser.add_argument('--cluster_sampling', default='vote_fps', help='Sampling strategy for vote clusters: vote_fps, seed_fps, random [default: vote_fps]')
+parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
 parser.add_argument('--ap_iou_thresholds', default='0.25,0.5', help='A list of AP IoU thresholds [default: 0.25,0.5]')
 parser.add_argument('--no_height', action='store_true', help='Do NOT use height signal in input.')
 parser.add_argument('--use_color', action='store_true', help='Use RGB color in input.')
@@ -48,10 +48,12 @@ parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out 
 parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
 parser.add_argument('--shuffle_dataset', action='store_true', help='Shuffle the dataset (random order).')
 
-parser.add_argument('--num_heading_bin', type=int, required=True, help='num_heading_bin for spatial discrete')
-parser.add_argument('--top_n_votes', type=int, required=True, help='Top n votes')
-parser.add_argument('--best_n_votes', type=int, required=True, help='Best n votes')
-parser.add_argument('--vote_cls_loss_weight', type=float, required=True, help='vote_cls_loss_weight')
+parser.add_argument('--num_heading_bin', type=int, default=4, help='num_heading_bin for spatial discrete')
+parser.add_argument('--disable_top_n_votes', action='store_true', help='disable_top_n_votes.')
+parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
+parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
+parser.add_argument('--sorted_by_prob', action='store_true', help='sorted_by_prob.')
+parser.add_argument('--vote_cls_loss_weight', type=float, default=0.8, help='vote_cls_loss_weight')
 parser.add_argument('--vote_cls_loss_weight_decay', default=False, action='store_true', help='enable vote_cls_loss_weight_decay')
 parser.add_argument('--vote_cls_loss_weight_decay_steps', default=None, type=str, help='vote_cls_loss_weight_decay_steps')
 parser.add_argument('--vote_cls_loss_weight_decay_rates', default=None, type=str, help='vote_cls_loss_weight_decay_rates')
@@ -151,7 +153,9 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                num_proposal=FLAGS.num_target,
                input_feature_dim=num_input_channel,
                vote_config=VC,
-               sampling=FLAGS.cluster_sampling)
+               sampling=FLAGS.cluster_sampling,
+               disable_top_n_votes=FLAGS.disable_top_n_votes,
+               sorted_by_prob=FLAGS.sorted_by_prob)
 net.to(device)
 criterion = MODEL.get_loss
 
