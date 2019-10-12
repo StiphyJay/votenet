@@ -180,7 +180,7 @@ class ProposalModuleMulti(nn.Module):
             sample_inds *= self.num_vote
             sample_inds = torch.cat([(sample_inds + i) for i in range(self.num_vote)], dim=1)
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
-        elif self.sampling == 'sorted_fps':
+        elif self.sampling in ['sorted_fps', 'sorted_random']:
             vote_sorted_key = end_points['vote_sorted_key'] # (batch_size, num_seed*num_vote)
             _, vote_best_n_inds = torch.topk(vote_sorted_key, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
             end_points['vote_best_n_inds'] = vote_best_n_inds
@@ -189,20 +189,14 @@ class ProposalModuleMulti(nn.Module):
             end_points['vote_best_n_xyz'] = new_vote_xyz
             vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(1).repeat(1,features.size(1),1)
             new_vote_features = torch.gather(features, 2, vote_best_n_inds_expand).contiguous()
-            xyz, features, fps_inds = self.vote_aggregation(new_vote_xyz, new_vote_features)
-            sample_inds = fps_inds
-        elif self.sampling == 'sorted_random':
-            vote_sorted_key = end_points['vote_sorted_key'] # (batch_size, num_seed*num_vote)
-            _, vote_best_n_inds = torch.topk(vote_sorted_key, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
-            end_points['vote_best_n_inds'] = vote_best_n_inds
-            vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(-1).repeat(1,1,3)
-            new_vote_xyz = torch.gather(xyz, 1, vote_best_n_inds_expand).contiguous()
-            end_points['vote_best_n_xyz'] = new_vote_xyz
-            vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(1).repeat(1,features.size(1),1)
-            new_vote_features = torch.gather(features, 2, vote_best_n_inds_expand).contiguous()
-
-            sample_inds = torch.randint(0, self.vote_config.best_n_votes, (batch_size, self.num_proposal), dtype=torch.int).cuda()
-            xyz, features, _ = self.vote_aggregation(new_vote_xyz, new_vote_features, sample_inds)
+            if self.sampling == 'sorted_fps':
+                xyz, features, fps_inds = self.vote_aggregation(new_vote_xyz, new_vote_features)
+                sample_inds = fps_inds
+            else:
+                sample_inds = torch.zeros((batch_size, self.num_proposal), dtype=torch.int).cuda()
+                for i in range(batch_size):
+                    sample_inds[i] = torch.randperm(self.vote_config.best_n_votes)[:self.num_proposal]
+                xyz, features, _ = self.vote_aggregation(new_vote_xyz, new_vote_features, sample_inds)
         else:
             log_string('Unknown sampling strategy: %s. Exiting!'%(self.sampling))
             exit()

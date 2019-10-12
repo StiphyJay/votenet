@@ -60,6 +60,11 @@ def compute_vote_loss(end_points):
     vote_best_n_seed_inds = end_points['vote_best_n_inds'] / num_vote
     vote_best_n_mask = torch.gather(seed_gt_votes_mask, 1, vote_best_n_seed_inds)
     end_points['pos_seed_vote_ratio'] = torch.sum(vote_best_n_mask).float() / torch.sum(seed_gt_votes_mask).float()
+    pos_vote_seed_ind = ((vote_best_n_seed_inds + 1) * vote_best_n_mask).float()
+    seed_vote_hist = torch.zeros((batch_size, num_seed), device=vote_best_n_seed_inds.device)
+    for i in range(batch_size):
+        seed_vote_hist[i] = torch.histc(pos_vote_seed_ind[i], bins=num_seed, min=0.5, max=num_seed+0.5)
+    end_points['pos_seed_vote_max_ratio'] = seed_vote_hist.max(dim=1).values.mean()
 
     # spatial class loss
     vote_spatial_score_reshape = end_points['vote_spatial_score'].transpose(1, 2).contiguous() # (batch_size, num_spatial_cls, num_seed)
