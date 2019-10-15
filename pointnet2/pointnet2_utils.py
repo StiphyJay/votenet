@@ -287,6 +287,40 @@ class BallQuery(Function):
 ball_query = BallQuery.apply
 
 
+class BallQueryStat(Function):
+    @staticmethod
+    def forward(ctx, radius, nsample, xyz, new_xyz):
+        # type: (Any, float, int, torch.Tensor, torch.Tensor) -> torch.Tensor
+        r"""
+
+        Parameters
+        ----------
+        radius : float
+            radius of the balls
+        nsample : int
+            maximum number of features in the balls
+        xyz : torch.Tensor
+            (B, N, 3) xyz coordinates of the features
+        new_xyz : torch.Tensor
+            (B, npoint, 3) centers of the ball query
+
+        Returns
+        -------
+        torch.Tensor
+            (B, npoint, nsample) tensor with the indicies of the features that form the query balls
+        torch.Tensor
+            (B) tensor with the number of balls that do not contain enough samplings
+        """
+        return _ext.ball_query_stat(new_xyz, xyz, radius, nsample)
+
+    @staticmethod
+    def backward(ctx, a=None):
+        return None, None, None, None
+
+
+ball_query_stat = BallQueryStat.apply
+
+
 class QueryAndGroup(nn.Module):
     r"""
     Groups with a ball query of radius
@@ -299,7 +333,9 @@ class QueryAndGroup(nn.Module):
         Maximum number of features to gather in the ball
     """
 
-    def __init__(self, radius, nsample, use_xyz=True, ret_grouped_xyz=False, normalize_xyz=False, sample_uniformly=False, ret_unique_cnt=False):
+    def __init__(self, radius, nsample, use_xyz=True, ret_grouped_xyz=False, 
+                 normalize_xyz=False, sample_uniformly=False, ret_unique_cnt=False,
+                 count_insuff=False):
         # type: (QueryAndGroup, float, int, bool) -> None
         super(QueryAndGroup, self).__init__()
         self.radius, self.nsample, self.use_xyz = radius, nsample, use_xyz
@@ -307,6 +343,7 @@ class QueryAndGroup(nn.Module):
         self.normalize_xyz = normalize_xyz
         self.sample_uniformly = sample_uniformly
         self.ret_unique_cnt = ret_unique_cnt
+        self.count_insuff = count_insuff
         if self.ret_unique_cnt:
             assert(self.sample_uniformly)
 
@@ -327,7 +364,10 @@ class QueryAndGroup(nn.Module):
         new_features : torch.Tensor
             (B, 3 + C, npoint, nsample) tensor
         """
-        idx = ball_query(self.radius, self.nsample, xyz, new_xyz)
+        if self.count_insuff:
+            idx, insuff_counter = ball_query_stat(self.radius, self.nsample, xyz, new_xyz)
+        else:
+            idx = ball_query(self.radius, self.nsample, xyz, new_xyz)
 
         if self.sample_uniformly:
             unique_cnt = torch.zeros((idx.shape[0], idx.shape[1]))
@@ -366,6 +406,8 @@ class QueryAndGroup(nn.Module):
             ret.append(grouped_xyz)
         if self.ret_unique_cnt:
             ret.append(unique_cnt)
+        if self.count_insuff:
+            ret.append(insuff_counter)
         if len(ret) == 1:
             return ret[0]
         else:

@@ -178,7 +178,8 @@ class PointnetSAModuleVotes(nn.Module):
             sigma: float = None, # for RBF pooling
             normalize_xyz: bool = False, # noramlize local XYZ with radius
             sample_uniformly: bool = False,
-            ret_unique_cnt: bool = False
+            ret_unique_cnt: bool = False,
+            count_insuff: bool = False
     ):
         super().__init__()
 
@@ -193,11 +194,13 @@ class PointnetSAModuleVotes(nn.Module):
             self.sigma = self.radius/2
         self.normalize_xyz = normalize_xyz
         self.ret_unique_cnt = ret_unique_cnt
+        self.count_insuff = count_insuff
 
         if npoint is not None:
             self.grouper = pointnet2_utils.QueryAndGroup(radius, nsample,
                 use_xyz=use_xyz, ret_grouped_xyz=True, normalize_xyz=normalize_xyz,
-                sample_uniformly=sample_uniformly, ret_unique_cnt=ret_unique_cnt)
+                sample_uniformly=sample_uniformly, ret_unique_cnt=ret_unique_cnt,
+                count_insuff=count_insuff)
         else:
             self.grouper = pointnet2_utils.GroupAll(use_xyz, ret_grouped_xyz=True)
 
@@ -239,14 +242,23 @@ class PointnetSAModuleVotes(nn.Module):
             xyz_flipped, inds
         ).transpose(1, 2).contiguous() if self.npoint is not None else None
 
-        if not self.ret_unique_cnt:
-            grouped_features, grouped_xyz = self.grouper(
+        if self.ret_unique_cnt and self.count_insuff:
+            grouped_features, grouped_xyz, unique_cnt, insuff_counter = self.grouper(
                 xyz, new_xyz, features
-            )  # (B, C, npoint, nsample)
-        else:
+            )  # (B, C, npoint, nsample), (B,3,npoint,nsample), (B,npoint), (B)
+        elif self.count_insuff:
+            grouped_features, grouped_xyz, insuff_counter = self.grouper(
+                xyz, new_xyz, features
+            )  # (B, C, npoint, nsample), (B,3,npoint,nsample), (B)
+        elif self.ret_unique_cnt:
             grouped_features, grouped_xyz, unique_cnt = self.grouper(
                 xyz, new_xyz, features
             )  # (B, C, npoint, nsample), (B,3,npoint,nsample), (B,npoint)
+        else:
+            grouped_features, grouped_xyz = self.grouper(
+                xyz, new_xyz, features
+            )  # (B, C, npoint, nsample), (B,3,npoint,nsample)
+
 
         new_features = self.mlp_module(
             grouped_features
@@ -266,10 +278,15 @@ class PointnetSAModuleVotes(nn.Module):
             new_features = torch.sum(new_features * rbf.unsqueeze(1), -1, keepdim=True) / float(self.nsample) # (B, mlp[-1], npoint, 1)
         new_features = new_features.squeeze(-1)  # (B, mlp[-1], npoint)
 
-        if not self.ret_unique_cnt:
-            return new_xyz, new_features, inds
-        else:
+        if self.ret_unique_cnt and self.count_insuff:
+            return new_xyz, new_features, inds, unique_cnt, insuff_counter
+        elif self.count_insuff:
+            return new_xyz, new_features, inds, insuff_counter
+        elif self.ret_unique_cnt:
             return new_xyz, new_features, inds, unique_cnt
+        else:
+            return new_xyz, new_features, inds
+
 
 class PointnetSAModuleMSGVotes(nn.Module):
     ''' Modified based on _PointnetSAModuleBase and PointnetSAModuleMSG
