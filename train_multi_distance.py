@@ -41,41 +41,52 @@ from tf_visualizer import Visualizer as TfVisualizer
 from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', default='votenet_multi_distance', help='Model file name [default: votenet_multi_distance]')
+
+# dataset
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
-parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader. [default: 8]')
-parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
-parser.add_argument('--log_dir', default='log', help='Dump dir to save model checkpoint [default: log]')
-parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
+parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use V2 box labels for SUN RGB-D dataset')
 parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
-parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
-parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
-parser.add_argument('--ap_iou_thresh', type=float, default=0.5, help='AP IoU threshold [default: 0.25]')
-parser.add_argument('--max_epoch', type=int, default=180, help='Epoch to run [default: 180]')
-parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
-parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
-parser.add_argument('--weight_decay', type=float, default=0, help='Optimization L2 weight decay [default: 0]')
-parser.add_argument('--bn_decay_step', type=int, default=20, help='Period of BN decay (in epochs) [default: 20]')
-parser.add_argument('--bn_decay_rate', type=float, default=0.5, help='Decay rate for BN decay [default: 0.5]')
-parser.add_argument('--lr_decay_steps', default='80,120,160', help='When to decay the learning rate (in epochs) [default: 80,120,160]')
-parser.add_argument('--lr_decay_rates', default='0.1,0.1,0.1', help='Decay rates for lr decay [default: 0.1,0.1,0.1]')
 parser.add_argument('--no_height', action='store_true', help='Do NOT use height signal in input.')
 parser.add_argument('--use_color', action='store_true', help='Use RGB color in input.')
-parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use V2 box labels for SUN RGB-D dataset')
-parser.add_argument('--overwrite', action='store_true', help='Overwrite existing log and dump folders.')
-parser.add_argument('--dump_results', action='store_true', help='Dump results.')
 
-parser.add_argument('--num_heading_bin', type=int, default=4, help='num_heading_bin for spatial discrete')
+# network
+parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
+parser.add_argument('--num_vote_heading', type=int, default=4, help='num_vote_heading for spatial discrete')
 parser.add_argument('--max_r', type=str, default='2.0,6.0', help='max_r')
 parser.add_argument('--max_z', type=str, default='1.6', help='max_z')
 parser.add_argument('--disable_top_n_votes', action='store_true', help='disable_top_n_votes.')
 parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
 parser.add_argument('--sorted_by_prob', action='store_true', help='sorted_by_prob.')
+parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
+parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
+parser.add_argument('--cluster_radius', type=float, default=0.3, help='cluster_radius')
+parser.add_argument('--cluster_nsample', type=int, default=16, help='cluster_nsample')
+
+# train
+parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
+parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader. [default: 8]')
+parser.add_argument('--max_epoch', type=int, default=180, help='Epoch to run [default: 180]')
+parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
+parser.add_argument('--lr_decay_steps', default='80,120,160', help='When to decay the learning rate (in epochs) [default: 80,120,160]')
+parser.add_argument('--lr_decay_rates', default='0.1,0.1,0.1', help='Decay rates for lr decay [default: 0.1,0.1,0.1]')
+parser.add_argument('--bn_decay_step', type=int, default=20, help='Period of BN decay (in epochs) [default: 20]')
+parser.add_argument('--bn_decay_rate', type=float, default=0.5, help='Decay rate for BN decay [default: 0.5]')
+parser.add_argument('--weight_decay', type=float, default=0, help='Optimization L2 weight decay [default: 0]')
 parser.add_argument('--vote_cls_loss_weight', type=float, default=0.8, help='vote_cls_loss_weight')
 parser.add_argument('--vote_cls_loss_weight_decay', default=False, action='store_true', help='enable vote_cls_loss_weight_decay')
 parser.add_argument('--vote_cls_loss_weight_decay_steps', default=None, type=str, help='vote_cls_loss_weight_decay_steps')
 parser.add_argument('--vote_cls_loss_weight_decay_rates', default=None, type=str, help='vote_cls_loss_weight_decay_rates')
+
+# eval
+parser.add_argument('--ap_iou_thresh', type=float, default=0.5, help='AP IoU threshold [default: 0.5]')
+
+# output
+parser.add_argument('--log_dir', default='log', help='Dump dir to save model checkpoint [default: log]')
+parser.add_argument('--overwrite', action='store_true', help='Overwrite existing log and dump folders.')
+parser.add_argument('--dump_results', action='store_true', help='Dump results.')
+parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
+
 FLAGS = parser.parse_args()
 
 # ------------------------------------------------------------------------- GLOBAL CONFIG BEG
@@ -92,7 +103,7 @@ LOG_DIR = FLAGS.log_dir
 DEFAULT_DUMP_DIR = os.path.join(LOG_DIR, 'dump')
 DUMP_DIR = FLAGS.dump_dir if FLAGS.dump_dir is not None else DEFAULT_DUMP_DIR
 DEFAULT_CHECKPOINT_PATH = os.path.join(LOG_DIR, 'checkpoint.tar')
-CHECKPOINT_PATH = FLAGS.checkpoint_path if FLAGS.checkpoint_path is not None \
+CHECKPOINT_PATH = FLAGS.ckpt if FLAGS.ckpt is not None \
     else DEFAULT_CHECKPOINT_PATH
 FLAGS.DUMP_DIR = DUMP_DIR
 
@@ -131,7 +142,7 @@ def my_worker_init_fn(worker_id):
     np.random.seed(np.random.get_state()[1][0] + worker_id)
 
 # Construct vote config
-VC = VoteConfigDistance(num_heading_bin=FLAGS.num_heading_bin,
+VC = VoteConfigDistance(num_vote_heading=FLAGS.num_vote_heading,
                         max_r=[float(x) for x in FLAGS.max_r.split(',')],
                         max_z=[float(x) for x in FLAGS.max_z.split(',')],
                         top_n_votes=FLAGS.top_n_votes,
@@ -178,16 +189,11 @@ TEST_DATALOADER = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE,
 print(len(TRAIN_DATALOADER), len(TEST_DATALOADER))
 
 # Init the model and optimzier
-MODEL = importlib.import_module(FLAGS.model) # import network module
+MODEL = importlib.import_module('votenet_multi_distance') # import network module
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_input_channel = int(FLAGS.use_color)*3 + int(not FLAGS.no_height)*1
 
-if FLAGS.model == 'boxnet':
-    Detector = MODEL.BoxNet
-elif FLAGS.model == 'votenet':
-    Detector = MODEL.VoteNet
-else:
-    Detector = MODEL.VoteNetMultiDistance
+Detector = MODEL.VoteNetMultiDistance
 
 net = Detector(num_class=DATASET_CONFIG.num_class,
                num_heading_bin=DATASET_CONFIG.num_heading_bin,
@@ -198,7 +204,9 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                vote_config=VC,
                sampling=FLAGS.cluster_sampling,
                disable_top_n_votes=FLAGS.disable_top_n_votes,
-               sorted_by_prob=FLAGS.sorted_by_prob)
+               sorted_by_prob=FLAGS.sorted_by_prob,
+               cluster_radius=FLAGS.cluster_radius,
+               cluster_nsample=FLAGS.cluster_nsample)
 
 if torch.cuda.device_count() > 1:
   log_string("Let's use %d GPUs!" % (torch.cuda.device_count()))

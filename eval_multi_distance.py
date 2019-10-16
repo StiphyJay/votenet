@@ -24,41 +24,52 @@ from model_util_vote import VoteConfigDistance
 from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', default='votenet_multi_distance', help='Model file name [default: votenet_multi_distance]')
+
+# dataset
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
+parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use SUN RGB-D V2 box labels.')
 parser.add_argument('--split', default='val', help='Dataset split. train or val. [default: val]')
-parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader. [default: 8]')
-parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
-parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
 parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
-parser.add_argument('--num_target', type=int, default=256, help='Point Number [default: 256]')
-parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
-parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
-parser.add_argument('--ap_iou_thresholds', default='0.25,0.5', help='A list of AP IoU thresholds [default: 0.25,0.5]')
 parser.add_argument('--no_height', action='store_true', help='Do NOT use height signal in input.')
 parser.add_argument('--use_color', action='store_true', help='Use RGB color in input.')
-parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use SUN RGB-D V2 box labels.')
-parser.add_argument('--use_3d_nms', action='store_true', help='Use 3D NMS instead of 2D NMS.')
-parser.add_argument('--use_cls_nms', action='store_true', help='Use per class NMS.')
-parser.add_argument('--use_old_type_nms', action='store_true', help='Use old type of NMS, IoBox2Area.')
-parser.add_argument('--per_class_proposal', action='store_true', help='Duplicate each proposal num_class times.')
-parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU threshold. [default: 0.25]')
-parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
-parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
-parser.add_argument('--shuffle_dataset', action='store_true', help='Shuffle the dataset (random order).')
 
-parser.add_argument('--num_heading_bin', type=int, default=4, help='num_heading_bin for spatial discrete')
+# network
+parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
+parser.add_argument('--num_vote_heading', type=int, default=4, help='num_vote_heading for spatial discrete')
 parser.add_argument('--max_r', type=str, default='2.0,6.0', help='max_r')
 parser.add_argument('--max_z', type=str, default='1.6', help='max_z')
 parser.add_argument('--disable_top_n_votes', action='store_true', help='disable_top_n_votes.')
 parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
 parser.add_argument('--sorted_by_prob', action='store_true', help='sorted_by_prob.')
+parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
+parser.add_argument('--num_target', type=int, default=256, help='Point Number [default: 256]')
+parser.add_argument('--cluster_radius', type=float, default=0.3, help='cluster_radius')
+parser.add_argument('--cluster_nsample', type=int, default=16, help='cluster_nsample')
+
+# eval
+parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
+parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader. [default: 8]')
+parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU threshold. [default: 0.25]')
+parser.add_argument('--use_3d_nms', action='store_true', help='Use 3D NMS instead of 2D NMS.')
+parser.add_argument('--use_cls_nms', action='store_true', help='Use per class NMS.')
+parser.add_argument('--use_old_type_nms', action='store_true', help='Use old type of NMS, IoBox2Area.')
+parser.add_argument('--per_class_proposal', action='store_true', help='Duplicate each proposal num_class times.')
+parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
+parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
+parser.add_argument('--shuffle_dataset', action='store_true', help='Shuffle the dataset (random order).')
+parser.add_argument('--ap_iou_thresholds', default='0.25,0.5', help='A list of AP IoU thresholds [default: 0.25,0.5]')
+
+# loss
 parser.add_argument('--vote_cls_loss_weight', type=float, default=0.8, help='vote_cls_loss_weight')
 parser.add_argument('--vote_cls_loss_weight_decay', default=False, action='store_true', help='enable vote_cls_loss_weight_decay')
 parser.add_argument('--vote_cls_loss_weight_decay_steps', default=None, type=str, help='vote_cls_loss_weight_decay_steps')
 parser.add_argument('--vote_cls_loss_weight_decay_rates', default=None, type=str, help='vote_cls_loss_weight_decay_rates')
 
+# output
+parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
+
+# statistics
 parser.add_argument('--compute_false_stat', action='store_true', help='compute_false_stat.')
 parser.add_argument('--obj_pos_prob', type=float, default=0.5, help='obj_pos_prob')
 parser.add_argument('--obj_neg_prob', type=float, default=0.5, help='obj_neg_prob')
@@ -71,7 +82,7 @@ if FLAGS.use_cls_nms:
 BATCH_SIZE = FLAGS.batch_size
 NUM_POINT = FLAGS.num_point
 DUMP_DIR = FLAGS.dump_dir
-CHECKPOINT_PATH = FLAGS.checkpoint_path
+CHECKPOINT_PATH = FLAGS.ckpt
 assert(CHECKPOINT_PATH is not None)
 FLAGS.DUMP_DIR = DUMP_DIR
 AP_IOU_THRESHOLDS = [float(x) for x in FLAGS.ap_iou_thresholds.split(',')]
@@ -106,7 +117,7 @@ def my_worker_init_fn(worker_id):
     np.random.seed(np.random.get_state()[1][0] + worker_id)
 
 # Construct vote config
-VC = VoteConfigDistance(num_heading_bin=FLAGS.num_heading_bin,
+VC = VoteConfigDistance(num_vote_heading=FLAGS.num_vote_heading,
                         max_r=[float(x) for x in FLAGS.max_r.split(',')],
                         max_z=[float(x) for x in FLAGS.max_z.split(',')],
                         top_n_votes=FLAGS.top_n_votes,
@@ -138,16 +149,11 @@ TEST_DATALOADER = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE,
     shuffle=FLAGS.shuffle_dataset, num_workers=FLAGS.num_workers, worker_init_fn=my_worker_init_fn)
 
 # Init the model and optimzier
-MODEL = importlib.import_module(FLAGS.model) # import network module
+MODEL = importlib.import_module('votenet_multi_distance') # import network module
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_input_channel = int(FLAGS.use_color)*3 + int(not FLAGS.no_height)*1
 
-if FLAGS.model == 'boxnet':
-    Detector = MODEL.BoxNet
-elif FLAGS.model == 'votenet':
-    Detector = MODEL.VoteNet
-else:
-    Detector = MODEL.VoteNetMultiDistance
+Detector = MODEL.VoteNetMultiDistance
 
 net = Detector(num_class=DATASET_CONFIG.num_class,
                num_heading_bin=DATASET_CONFIG.num_heading_bin,
@@ -158,7 +164,9 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                vote_config=VC,
                sampling=FLAGS.cluster_sampling,
                disable_top_n_votes=FLAGS.disable_top_n_votes,
-               sorted_by_prob=FLAGS.sorted_by_prob)
+               sorted_by_prob=FLAGS.sorted_by_prob,
+               cluster_radius=FLAGS.cluster_radius,
+               cluster_nsample=FLAGS.cluster_nsample)
 net.to(device)
 criterion = MODEL.get_loss
 

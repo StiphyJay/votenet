@@ -77,10 +77,10 @@ class VotingModuleMulti(nn.Module):
         """
         super().__init__()
         self.config = config
-        self.num_heading_bin = self.config.num_heading_bin
+        self.num_vote_heading = self.config.num_vote_heading
         self.in_dim = seed_feature_dim
 
-        start_theta = torch.arange(self.num_heading_bin, dtype=torch.float32) * 2 * self.config.max_theta
+        start_theta = torch.arange(self.num_vote_heading, dtype=torch.float32) * 2 * self.config.max_theta
         self.register_buffer('start_theta', start_theta.repeat(2).view(1, 1, -1))
         
         # TODO: layer parameter
@@ -119,7 +119,7 @@ class VotingModuleMulti(nn.Module):
         offset_r *= self.config.max_r
         offset_z *= self.config.max_z
         
-        offset_z[:,:,self.num_heading_bin:] *= -1.0
+        offset_z[:,:,self.num_vote_heading:] *= -1.0
         
         res_theta = net[:,:,:,2] * self.config.max_theta
         offset_theta = res_theta + self.start_theta # (batch_size, num_seed, num_spatial_cls)
@@ -150,13 +150,13 @@ class VotingModuleMultiDistance(nn.Module):
         """
         super().__init__()
         self.config = config
-        self.num_heading_bin = self.config.num_heading_bin
+        self.num_vote_heading = self.config.num_vote_heading
         self.in_dim = seed_feature_dim
         
         # buffer variable
         self.register_buffer('max_r', torch.tensor(self.config.max_r, dtype=torch.float32).view(1, -1, 1))
         self.register_buffer('max_z', torch.tensor(self.config.max_z, dtype=torch.float32).view(1, -1, 1))
-        self.register_buffer('start_theta', torch.arange(self.num_heading_bin, dtype=torch.float32) * 2 * self.config.max_theta)
+        self.register_buffer('start_theta', torch.arange(self.num_vote_heading, dtype=torch.float32) * 2 * self.config.max_theta)
         
         # TODO: layer parameter
         self.out_vote_dim = 3 + self.in_dim + 1 # (r, z, theta) + (feature) + score
@@ -193,12 +193,12 @@ class VotingModuleMultiDistance(nn.Module):
         offset_r = offset_r.view(batch_size, num_seed, -1, 1)
 
         #parse z
-        offset_z = self.config.parse_z(net[..., 1].view(-1, self.config.num_z, 2*self.num_heading_bin))
+        offset_z = self.config.parse_z(net[..., 1].view(-1, self.config.num_z, 2*self.num_vote_heading))
         offset_z *= self.max_z
-        offset_z[..., self.num_heading_bin:] *= -1.0
+        offset_z[..., self.num_vote_heading:] *= -1.0
         offset_z = offset_z.view(batch_size, num_seed, -1, 1)
         
-        res_theta = net[..., 2].view(-1, self.num_heading_bin) * self.config.max_theta
+        res_theta = net[..., 2].view(-1, self.num_vote_heading) * self.config.max_theta
         offset_theta = res_theta + self.start_theta
         offset_theta = offset_theta.view(batch_size, num_seed, -1, 1)
 

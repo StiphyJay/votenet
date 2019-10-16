@@ -116,7 +116,8 @@ class ProposalModule(nn.Module):
 
 class ProposalModuleMulti(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
-                 num_proposal, sampling, seed_feat_dim=256, vote_config=VoteConfig()):
+                 num_proposal, sampling, seed_feat_dim=256, vote_config=VoteConfig(),
+                 radius=0.3, nsample=16):
         super().__init__() 
 
         self.num_class = num_class
@@ -134,8 +135,8 @@ class ProposalModuleMulti(nn.Module):
         # Vote clustering
         self.vote_aggregation = PointnetSAModuleVotes( 
                 npoint=self.num_proposal,
-                radius=0.3,
-                nsample=16,
+                radius=radius,
+                nsample=nsample,
                 mlp=[self.seed_feat_dim, 128, 128, 128],
                 use_xyz=True,
                 normalize_xyz=True

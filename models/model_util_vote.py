@@ -11,7 +11,7 @@ sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 
 class VoteConfig(object):
     def __init__(self, 
-                 num_heading_bin=4,
+                 num_vote_heading=4,
                  max_r=5.75,
                  max_z=1.6,
                  parse_r=F.relu,
@@ -19,12 +19,12 @@ class VoteConfig(object):
                  top_n_votes=3,
                  best_n_votes=768):
         
-        self.num_heading_bin = num_heading_bin
-        self.num_spatial_cls = self.num_heading_bin * 2
+        self.num_vote_heading = num_vote_heading
+        self.num_spatial_cls = self.num_vote_heading * 2
 
         self.max_r = max_r
         self.max_z = max_z
-        self.max_theta = np.pi / self.num_heading_bin
+        self.max_theta = np.pi / self.num_vote_heading
         
         self.parse_r = parse_r
         self.parse_z = parse_z
@@ -37,7 +37,7 @@ class VoteConfig(object):
 
 class VoteConfigDistance(object):
     def __init__(self, 
-                 num_heading_bin=4,
+                 num_vote_heading=4,
                  max_r=(2.0, 6.0),
                  max_z=(1.6,),
                  parse_r=F.relu,
@@ -45,14 +45,14 @@ class VoteConfigDistance(object):
                  top_n_votes=3,
                  best_n_votes=768):
 
-        self.num_heading_bin = num_heading_bin
+        self.num_vote_heading = num_vote_heading
         self.num_r = len(max_r)
         self.num_z = len(max_z)
-        self.num_spatial_cls = self.num_r * self.num_z * 2 * self.num_heading_bin
+        self.num_spatial_cls = self.num_r * self.num_z * 2 * self.num_vote_heading
 
         self.max_r = sorted(max_r)
         self.max_z = sorted(max_z)
-        self.max_theta = np.pi / self.num_heading_bin
+        self.max_theta = np.pi / self.num_vote_heading
         
         self.parse_r = parse_r
         self.parse_z = parse_z
@@ -65,7 +65,7 @@ class VoteConfigDistance(object):
 
 class VoteConfig_Discrete_Polar(object):
     def __init__(self, 
-                 num_heading_bin=8,
+                 num_vote_heading=8,
                  fixed_votes_r=(0.25, 0.75, 1.5, 3.0),
                  fixed_votes_z=(-0.75, -0.25, 0.25, 0.75), 
                  top_n_votes=3,
@@ -75,18 +75,18 @@ class VoteConfig_Discrete_Polar(object):
         self.num_z_vote = len(fixed_votes_z)
         
         
-        self.num_heading_bin = num_heading_bin
-        self.num_spatial_cls = self.num_heading_bin * self.num_r_vote * self.num_z_vote
+        self.num_vote_heading = num_vote_heading
+        self.num_spatial_cls = self.num_vote_heading * self.num_r_vote * self.num_z_vote
 
         # compute fixed votes in xyz
-        start_theta = torch.arange(self.num_heading_bin, dtype=torch.float32) * (2 * np.pi) / self.num_heading_bin
+        start_theta = torch.arange(self.num_vote_heading, dtype=torch.float32) * (2 * np.pi) / self.num_vote_heading
         fixed_votes_r = torch.tensor(fixed_votes_r).view(1, -1)
         fixed_votes_x = torch.cos(start_theta).view(-1, 1) * fixed_votes_r
         fixed_votes_y = torch.sin(start_theta).view(-1, 1) * fixed_votes_r
-        fixed_votes_z = torch.tensor(fixed_votes_z).view(1, 1, -1, 1).repeat(self.num_heading_bin, self.num_r_vote, 1, 1)
+        fixed_votes_z = torch.tensor(fixed_votes_z).view(1, 1, -1, 1).repeat(self.num_vote_heading, self.num_r_vote, 1, 1)
         self.fixed_votes = torch.cat((fixed_votes_x.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, self.num_z_vote, 1), 
                                       fixed_votes_y.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, self.num_z_vote, 1),
-                                      fixed_votes_z), dim=3) # (num_heading_bin, num_r_vote, num_z_vote, 3)
+                                      fixed_votes_z), dim=3) # (num_vote_heading, num_r_vote, num_z_vote, 3)
         self.fixed_votes = self.fixed_votes.view(-1, 3)
 
         self.top_n_votes = top_n_votes

@@ -65,7 +65,7 @@ parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use V2 box la
 parser.add_argument('--overwrite', action='store_true', help='Overwrite existing log and dump folders.')
 parser.add_argument('--dump_results', action='store_true', help='Dump results.')
 
-parser.add_argument('--num_heading_bin', type=int, default=4, help='num_heading_bin for spatial discrete')
+parser.add_argument('--num_vote_heading', type=int, default=4, help='num_vote_heading for spatial discrete')
 parser.add_argument('--disable_top_n_votes', action='store_true', help='disable_top_n_votes.')
 parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
@@ -129,7 +129,7 @@ def my_worker_init_fn(worker_id):
     np.random.seed(np.random.get_state()[1][0] + worker_id)
 
 # Construct vote config
-VC = VoteConfig(num_heading_bin=FLAGS.num_heading_bin,
+VC = VoteConfig(num_vote_heading=FLAGS.num_vote_heading,
                 top_n_votes=FLAGS.top_n_votes,
                 best_n_votes=FLAGS.best_n_votes)
 
