@@ -12,7 +12,6 @@ Author: Charles R. Qi and Or Litany
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from numpy import pi
 
 class VotingModule(nn.Module):
     def __init__(self, vote_factor, seed_feature_dim):
@@ -81,9 +80,8 @@ class VotingModuleMulti(nn.Module):
         self.num_heading_bin = self.config.num_heading_bin
         self.in_dim = seed_feature_dim
 
-        start_theta = torch.arange(self.num_heading_bin, dtype=torch.float32) * (2 * pi) / self.num_heading_bin
-        start_theta = start_theta.repeat(2).view(1, 1, -1)
-        self.register_buffer('start_theta', start_theta)
+        start_theta = torch.arange(self.num_heading_bin, dtype=torch.float32) * 2 * self.config.max_theta
+        self.register_buffer('start_theta', start_theta.repeat(2).view(1, 1, -1))
         
         # TODO: layer parameter
         self.out_vote_dim = 3 + self.in_dim + 1 # (r, z, theta) + (feature) + score
@@ -158,7 +156,7 @@ class VotingModuleMultiDistance(nn.Module):
         # buffer variable
         self.register_buffer('max_r', torch.tensor(self.config.max_r, dtype=torch.float32).view(1, -1, 1))
         self.register_buffer('max_z', torch.tensor(self.config.max_z, dtype=torch.float32).view(1, -1, 1))
-        self.register_buffer('start_theta', torch.arange(self.num_heading_bin, dtype=torch.float32) * (2 * pi) / self.num_heading_bin)
+        self.register_buffer('start_theta', torch.arange(self.num_heading_bin, dtype=torch.float32) * 2 * self.config.max_theta)
         
         # TODO: layer parameter
         self.out_vote_dim = 3 + self.in_dim + 1 # (r, z, theta) + (feature) + score

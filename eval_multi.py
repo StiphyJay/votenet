@@ -28,7 +28,7 @@ parser.add_argument('--model', default='votenet_multi', help='Model file name [d
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
 parser.add_argument('--split', default='val', help='Dataset split. train or val. [default: val]')
 parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader. [default: 4]')
-parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
+parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
 parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
 parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
 parser.add_argument('--num_target', type=int, default=256, help='Point Number [default: 256]')
@@ -69,7 +69,7 @@ if FLAGS.use_cls_nms:
 BATCH_SIZE = FLAGS.batch_size
 NUM_POINT = FLAGS.num_point
 DUMP_DIR = FLAGS.dump_dir
-CHECKPOINT_PATH = FLAGS.checkpoint_path
+CHECKPOINT_PATH = FLAGS.ckpt
 assert(CHECKPOINT_PATH is not None)
 FLAGS.DUMP_DIR = DUMP_DIR
 AP_IOU_THRESHOLDS = [float(x) for x in FLAGS.ap_iou_thresholds.split(',')]
@@ -161,7 +161,9 @@ criterion = MODEL.get_loss
 # Load checkpoint if there is any
 if CHECKPOINT_PATH is not None and os.path.isfile(CHECKPOINT_PATH):
     checkpoint = torch.load(CHECKPOINT_PATH)
-    net.load_state_dict(checkpoint['model_state_dict'])
+    cur_state = net.state_dict()
+    cur_state.update(checkpoint['model_state_dict'])
+    net.load_state_dict(cur_state)
     epoch = checkpoint['epoch']
     best_mAP = checkpoint['mAP']
     log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f)"%(CHECKPOINT_PATH, epoch, best_mAP))
