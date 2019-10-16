@@ -151,38 +151,27 @@ class ScannetDetectionDatasetMultiDistance(Dataset):
                 point_votes_mask[ind] = 1.0
         
         # add spatial label
-        votes_label_cls = np.zeros(self.num_points)
-        for i in range(self.num_points):
-            cur_vote = point_votes[i]
+        votes_angle = np.arctan2(point_votes[:, 1], point_votes[:, 0])
+        votes_angle[votes_angle < 0.0] += 2*np.pi
+        ind_angle = (votes_angle + self.vote_config.max_theta) / (2 * self.vote_config.max_theta)
+        ind_angle = np.floor(ind_angle) % self.vote_config.num_vote_heading
 
-            vote_r = np.linalg.norm(cur_vote[:2])
-            if vote_r >= self.vote_config.max_r[-1]:
-                ind_r = self.vote_config.num_r - 1
-            else:
-                for j, max_r in enumerate(self.vote_config.max_r):
-                    if vote_r < max_r:
-                        ind_r = j
-                        break
-            
-            vote_z = np.abs(cur_vote[2])
-            if vote_z >= self.vote_config.max_z[-1]:
-                ind_z = self.vote_config.num_z - 1
-            else:
-                for j, max_z in enumerate(self.vote_config.max_z):
-                    if vote_z < max_z:
-                        ind_z = j
-                        break
-            
-            ind_lower = 0 if cur_vote[2] >=0 else 1
+        ind_lower = (point_votes[:, 2] < 0.0).astype(np.int32)
 
-            votes_angle = np.arctan2(cur_vote[1], cur_vote[0])
-            if votes_angle < 0.0:
-                votes_angle += 2*np.pi
-            ind_angle = (votes_angle + self.vote_config.max_theta) / (2 * self.vote_config.max_theta)
-            ind_angle = np.floor(ind_angle) % self.vote_config.num_vote_heading
+        ind_z = np.zeros(self.num_points)
+        vote_z = np.abs(point_votes[:, 2])
+        ind_z[vote_z >= self.vote_config.max_z[-1]] = self.vote_config.num_z - 1
+        for i in range(self.vote_config.num_z - 1, -1, -1):
+            ind_z[vote_z < self.vote_config.max_z[i]] = i
+        
+        ind_r = np.zeros(self.num_points)
+        vote_r = np.linalg.norm(point_votes[:, :2], axis=1)
+        ind_r[vote_r >= self.vote_config.max_r[-1]] = self.vote_config.num_r - 1
+        for i in range(self.vote_config.num_r - 1, -1, -1):
+            ind_r[vote_r < self.vote_config.max_r[i]] = i
 
-            votes_label_cls[i] = ind_r*self.vote_config.num_z*2*self.vote_config.num_vote_heading + ind_z*2*self.vote_config.num_vote_heading \
-                               + ind_lower*self.vote_config.num_vote_heading + ind_angle
+        votes_label_cls = ind_r*self.vote_config.num_z*2*self.vote_config.num_vote_heading + ind_z*2*self.vote_config.num_vote_heading \
+                        + ind_lower*self.vote_config.num_vote_heading + ind_angle
 
         class_ind = [np.where(DC.nyu40ids == x)[0][0] for x in instance_bboxes[:,-1]]   
         # NOTE: set size class as semantic class. Consider use size2class.
