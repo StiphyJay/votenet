@@ -21,15 +21,15 @@ import pc_util
 from model_util_scannet import rotate_aligned_boxes
 
 from model_util_scannet import ScannetDatasetConfig
-from model_util_vote import VoteConfig
+from model_util_vote import VoteConfigDistance
 DC = ScannetDatasetConfig()
 MAX_NUM_OBJ = 64
 MEAN_COLOR_RGB = np.array([109.8, 97.2, 83.8])
 
-class ScannetDetectionDatasetMulti(Dataset):
+class ScannetDetectionDatasetMultiDistance(Dataset):
        
     def __init__(self, split_set='train', num_points=20000,
-        use_color=False, use_height=False, augment=False, vote_config=VoteConfig()):
+        use_color=False, use_height=False, augment=False, vote_config=VoteConfigDistance()):
 
         self.data_path = os.path.join(BASE_DIR, 'scannet_train_detection_data')
         all_scan_names = list(set([os.path.basename(x)[0:12] \
@@ -151,13 +151,39 @@ class ScannetDetectionDatasetMulti(Dataset):
                 point_votes_mask[ind] = 1.0
         
         # add spatial label
-        votes_angle = np.arctan2(point_votes[:, 1], point_votes[:, 0])
-        votes_angle[votes_angle < 0.0] += 2*np.pi
-        votes_angle_cls = (votes_angle + self.vote_config.max_theta) / (2 * self.vote_config.max_theta)
-        votes_angle_cls = np.floor(votes_angle_cls) % self.vote_config.num_heading_bin
-        votes_angle_cls[point_votes[:, 2] < 0] += self.vote_config.num_heading_bin
+        votes_label_cls = np.zeros(self.num_points)
+        for i in range(self.num_points):
+            cur_vote = point_votes[i]
 
-        
+            vote_r = np.linalg.norm(cur_vote[:2])
+            if vote_r >= self.vote_config.max_r[-1]:
+                ind_r = self.vote_config.num_r - 1
+            else:
+                for j, max_r in enumerate(self.vote_config.max_r):
+                    if vote_r < max_r:
+                        ind_r = j
+                        break
+            
+            vote_z = np.abs(cur_vote[2])
+            if vote_z >= self.vote_config.max_z[-1]:
+                ind_z = self.vote_config.num_z - 1
+            else:
+                for j, max_z in enumerate(self.vote_config.max_z):
+                    if vote_z < max_z:
+                        ind_z = j
+                        break
+            
+            ind_lower = 0 if cur_vote[2] >=0 else 1
+
+            votes_angle = np.arctan2(cur_vote[1], cur_vote[0])
+            if votes_angle < 0.0:
+                votes_angle += 2*np.pi
+            ind_angle = (votes_angle + self.vote_config.max_theta) / (2 * self.vote_config.max_theta)
+            ind_angle = np.floor(ind_angle) % self.vote_config.num_heading_bin
+
+            votes_label_cls[i] = ind_r*self.vote_config.num_z*2*self.vote_config.num_heading_bin + ind_z*2*self.vote_config.num_heading_bin \
+                               + ind_lower*self.vote_config.num_heading_bin + ind_angle
+
         class_ind = [np.where(DC.nyu40ids == x)[0][0] for x in instance_bboxes[:,-1]]   
         # NOTE: set size class as semantic class. Consider use size2class.
         size_classes[0:instance_bboxes.shape[0]] = class_ind
@@ -177,7 +203,7 @@ class ScannetDetectionDatasetMulti(Dataset):
         ret_dict['sem_cls_label'] = target_bboxes_semcls.astype(np.int64)
         ret_dict['box_label_mask'] = target_bboxes_mask.astype(np.float32)
         ret_dict['vote_label'] = point_votes.astype(np.float32)
-        ret_dict['vote_label_cls'] = votes_angle_cls.astype(np.int64)
+        ret_dict['vote_label_cls'] = votes_label_cls.astype(np.int64)
         ret_dict['vote_label_mask'] = point_votes_mask.astype(np.int64)
         ret_dict['scan_idx'] = np.array(idx).astype(np.int64)
         ret_dict['pcl_color'] = pcl_color

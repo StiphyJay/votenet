@@ -33,16 +33,16 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 import pc_util
 import sunrgbd_utils
 from model_util_sunrgbd import SunrgbdDatasetConfig
-from model_util_vote import VoteConfig
+from model_util_vote import VoteConfigDistance
 
 DC = SunrgbdDatasetConfig() # dataset specific config
 MAX_NUM_OBJ = 64 # maximum number of objects allowed per scene
 MEAN_COLOR_RGB = np.array([0.5,0.5,0.5]) # sunrgbd color is in 0~1
 
-class SunrgbdDetectionVotesDatasetMulti(Dataset):
+class SunrgbdDetectionVotesDatasetMultiDistance(Dataset):
     def __init__(self, split_set='train', num_points=20000,
         use_color=False, use_height=False, use_v1=False,
-        augment=False, scan_idx_list=None, vote_config=VoteConfig()):
+        augment=False, scan_idx_list=None, vote_config=VoteConfigDistance()):
 
         assert(num_points<=50000)
         self.use_v1 = use_v1 
@@ -197,11 +197,38 @@ class SunrgbdDetectionVotesDatasetMulti(Dataset):
         point_votes = point_votes[choices,1:4]
 
         # add spatial label
-        votes_angle = np.arctan2(point_votes[:, 1], point_votes[:, 0])
-        votes_angle[votes_angle < 0.0] += 2*np.pi
-        votes_angle_cls = (votes_angle + self.vote_config.max_theta) / (2 * self.vote_config.max_theta)
-        votes_angle_cls = np.floor(votes_angle_cls) % self.vote_config.num_heading_bin
-        votes_angle_cls[point_votes[:, 2] < 0] += self.vote_config.num_heading_bin
+        votes_label_cls = np.zeros(self.num_points)
+        for i in range(self.num_points):
+            cur_vote = point_votes[i]
+
+            vote_r = np.linalg.norm(cur_vote[:2])
+            if vote_r >= self.vote_config.max_r[-1]:
+                ind_r = self.vote_config.num_r - 1
+            else:
+                for j, max_r in enumerate(self.vote_config.max_r):
+                    if vote_r < max_r:
+                        ind_r = j
+                        break
+            
+            vote_z = np.abs(cur_vote[2])
+            if vote_z >= self.vote_config.max_z[-1]:
+                ind_z = self.vote_config.num_z - 1
+            else:
+                for j, max_z in enumerate(self.vote_config.max_z):
+                    if vote_z < max_z:
+                        ind_z = j
+                        break
+            
+            ind_lower = 0 if cur_vote[2] >=0 else 1
+
+            votes_angle = np.arctan2(cur_vote[1], cur_vote[0])
+            if votes_angle < 0.0:
+                votes_angle += 2*np.pi
+            ind_angle = (votes_angle + self.vote_config.max_theta) / (2 * self.vote_config.max_theta)
+            ind_angle = np.floor(ind_angle) % self.vote_config.num_heading_bin
+
+            votes_label_cls[i] = ind_r*self.vote_config.num_z*2*self.vote_config.num_heading_bin + ind_z*2*self.vote_config.num_heading_bin \
+                               + ind_lower*self.vote_config.num_heading_bin + ind_angle
 
         ret_dict = {}
         ret_dict['point_clouds'] = point_cloud.astype(np.float32)
@@ -215,7 +242,7 @@ class SunrgbdDetectionVotesDatasetMulti(Dataset):
         ret_dict['sem_cls_label'] = target_bboxes_semcls.astype(np.int64)
         ret_dict['box_label_mask'] = target_bboxes_mask.astype(np.float32)
         ret_dict['vote_label'] = point_votes.astype(np.float32)
-        ret_dict['vote_label_cls'] = votes_angle_cls.astype(np.int64)
+        ret_dict['vote_label_cls'] = votes_label_cls.astype(np.int64)
         ret_dict['vote_label_mask'] = point_votes_mask.astype(np.int64)
         ret_dict['scan_idx'] = np.array(idx).astype(np.int64)
         ret_dict['max_gt_bboxes'] = max_bboxes
