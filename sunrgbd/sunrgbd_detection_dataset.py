@@ -254,10 +254,9 @@ def get_sem_cls_statistics():
     """ Compute number of objects for each semantic class """
     d = SunrgbdDetectionVotesDataset(use_height=True, use_color=True, use_v1=True, augment=True)
     sem_cls_cnt = {}
-    for i in range(len(d)):
-        if i%10==0: print(i)
+    from tqdm import tqdm
+    for i in tqdm(range(len(d))):
         sample = d[i]
-        pc = sample['point_clouds']
         sem_cls = sample['sem_cls_label']
         mask = sample['box_label_mask']
         for j in sem_cls:
