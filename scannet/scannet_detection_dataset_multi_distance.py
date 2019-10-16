@@ -179,10 +179,10 @@ class ScannetDetectionDatasetMultiDistance(Dataset):
             if votes_angle < 0.0:
                 votes_angle += 2*np.pi
             ind_angle = (votes_angle + self.vote_config.max_theta) / (2 * self.vote_config.max_theta)
-            ind_angle = np.floor(ind_angle) % self.vote_config.num_heading_bin
+            ind_angle = np.floor(ind_angle) % self.vote_config.num_vote_heading
 
-            votes_label_cls[i] = ind_r*self.vote_config.num_z*2*self.vote_config.num_heading_bin + ind_z*2*self.vote_config.num_heading_bin \
-                               + ind_lower*self.vote_config.num_heading_bin + ind_angle
+            votes_label_cls[i] = ind_r*self.vote_config.num_z*2*self.vote_config.num_vote_heading + ind_z*2*self.vote_config.num_vote_heading \
+                               + ind_lower*self.vote_config.num_vote_heading + ind_angle
 
         class_ind = [np.where(DC.nyu40ids == x)[0][0] for x in instance_bboxes[:,-1]]   
         # NOTE: set size class as semantic class. Consider use size2class.

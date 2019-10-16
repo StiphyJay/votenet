@@ -185,7 +185,7 @@ class VotingModuleMultiDistance(nn.Module):
         net = F.relu(self.bn2(self.conv2(net))) 
         net = self.conv3(net) # (batch_size, num_spatial_cls*(3+out_dim+1), num_seed)
                 
-        net = net.transpose(2,1).view(batch_size, num_seed, -1, self.out_vote_dim)
+        net = net.transpose(2,1).contiguous().view(batch_size, num_seed, -1, self.out_vote_dim)
 
         # parse r
         offset_r = self.config.parse_r(net[..., 0].view(batch_size*num_seed, self.config.num_r, -1))
