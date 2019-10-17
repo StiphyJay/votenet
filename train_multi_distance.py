@@ -43,21 +43,21 @@ from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 parser = argparse.ArgumentParser()
 
 # dataset
-parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
+parser.add_argument('--dataset', default='scannet', help='Dataset name. sunrgbd or scannet. [default: scannet]')
 parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use V2 box labels for SUN RGB-D dataset')
-parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
+parser.add_argument('--num_point', type=int, default=40000, help='Point Number [default: 40000]')
 parser.add_argument('--no_height', action='store_true', help='Do NOT use height signal in input.')
 parser.add_argument('--use_color', action='store_true', help='Use RGB color in input.')
 
 # network
 parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
 parser.add_argument('--num_vote_heading', type=int, default=4, help='num_vote_heading for spatial discrete')
-parser.add_argument('--max_r', type=str, default='2.0,6.0', help='max_r')
+parser.add_argument('--max_r', type=str, default='5.75', help='max_r')
 parser.add_argument('--max_z', type=str, default='1.6', help='max_z')
-parser.add_argument('--disable_top_n_votes', action='store_true', help='disable_top_n_votes.')
+parser.add_argument('--enable_top_n_votes', action='store_true', help='enable_top_n_votes.')
 parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
-parser.add_argument('--sorted_by_prob', action='store_true', help='sorted_by_prob.')
+parser.add_argument('--sorted_by_score', action='store_true', help='sorted_by_score.')
 parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
 parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
 parser.add_argument('--cluster_radius', type=float, default=0.3, help='cluster_radius')
@@ -66,10 +66,10 @@ parser.add_argument('--cluster_nsample', type=int, default=16, help='cluster_nsa
 # train
 parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
 parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader. [default: 8]')
-parser.add_argument('--max_epoch', type=int, default=180, help='Epoch to run [default: 180]')
+parser.add_argument('--max_epoch', type=int, default=350, help='Epoch to run [default: 350]')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
-parser.add_argument('--lr_decay_steps', default='80,120,160', help='When to decay the learning rate (in epochs) [default: 80,120,160]')
-parser.add_argument('--lr_decay_rates', default='0.1,0.1,0.1', help='Decay rates for lr decay [default: 0.1,0.1,0.1]')
+parser.add_argument('--lr_decay_steps', default='250', help='When to decay the learning rate (in epochs) [default: 80,120,160]')
+parser.add_argument('--lr_decay_rates', default='0.1', help='Decay rates for lr decay [default: 0.1]')
 parser.add_argument('--bn_decay_step', type=int, default=20, help='Period of BN decay (in epochs) [default: 20]')
 parser.add_argument('--bn_decay_rate', type=float, default=0.5, help='Decay rate for BN decay [default: 0.5]')
 parser.add_argument('--weight_decay', type=float, default=0, help='Optimization L2 weight decay [default: 0]')
@@ -203,8 +203,8 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                input_feature_dim=num_input_channel,
                vote_config=VC,
                sampling=FLAGS.cluster_sampling,
-               disable_top_n_votes=FLAGS.disable_top_n_votes,
-               sorted_by_prob=FLAGS.sorted_by_prob,
+               disable_top_n_votes=(not FLAGS.enable_top_n_votes),
+               sorted_by_prob=(not FLAGS.sorted_by_score),
                cluster_radius=FLAGS.cluster_radius,
                cluster_nsample=FLAGS.cluster_nsample)
 
