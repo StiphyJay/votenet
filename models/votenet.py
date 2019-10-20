@@ -17,6 +17,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 from backbone_module import Pointnet2Backbone
+from backbone_module_deep import Pointnet2BackboneDeep
+from backbone_module_deeper import Pointnet2BackboneDeeper
 from voting_module import VotingModule
 from proposal_module import ProposalModule
 from dump_helper import dump_results
@@ -43,7 +45,8 @@ class VoteNet(nn.Module):
     """
 
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
-        input_feature_dim=0, num_proposal=128, vote_factor=1, sampling='vote_fps'):
+                 input_feature_dim=0, num_proposal=128, vote_factor=1, sampling='vote_fps', 
+                 backbone='standard'):
         super().__init__()
 
         self.num_class = num_class
@@ -57,7 +60,12 @@ class VoteNet(nn.Module):
         self.sampling=sampling
 
         # Backbone point feature learning
-        self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
+        if backbone == 'standard':
+            self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
+        elif backbone == 'deep':
+            self.backbone_net = Pointnet2BackboneDeep(input_feature_dim=self.input_feature_dim)
+        elif backbone == 'deeper':
+            self.backbone_net = Pointnet2BackboneDeeper(input_feature_dim=self.input_feature_dim)
 
         # Hough voting
         self.vgen = VotingModule(self.vote_factor, 256)

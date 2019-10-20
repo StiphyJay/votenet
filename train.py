@@ -41,6 +41,7 @@ from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', default='votenet', help='Model file name [default: votenet]')
+parser.add_argument('--backbone', default='standard', help='Depth of pointnet++.')
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
 parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for dataloader. [default: 4]')
 parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
@@ -162,7 +163,8 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                num_proposal=FLAGS.num_target,
                input_feature_dim=num_input_channel,
                vote_factor=FLAGS.vote_factor,
-               sampling=FLAGS.cluster_sampling)
+               sampling=FLAGS.cluster_sampling,
+               backbone=FLAGS.backbone)
 
 if torch.cuda.device_count() > 1:
   log_string("Let's use %d GPUs!" % (torch.cuda.device_count()))

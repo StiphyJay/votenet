@@ -34,6 +34,7 @@ parser.add_argument('--no_height', action='store_true', help='Do NOT use height 
 parser.add_argument('--use_color', action='store_true', help='Use RGB color in input.')
 
 # network
+parser.add_argument('--backbone', default='standard', help='Depth of pointnet++.')
 parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
 parser.add_argument('--num_vote_heading', type=int, default=4, help='num_vote_heading for spatial discrete')
 parser.add_argument('--max_r', type=str, default='2.0,6.0', help='max_r')
@@ -166,7 +167,8 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                disable_top_n_votes=FLAGS.disable_top_n_votes,
                sorted_by_prob=FLAGS.sorted_by_prob,
                cluster_radius=FLAGS.cluster_radius,
-               cluster_nsample=FLAGS.cluster_nsample)
+               cluster_nsample=FLAGS.cluster_nsample,
+               backbone=FLAGS.backbone)
 net.to(device)
 criterion = MODEL.get_loss
 

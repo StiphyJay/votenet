@@ -24,6 +24,7 @@ from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', default='votenet', help='Model file name [default: votenet]')
+parser.add_argument('--backbone', default='standard', help='Depth of pointnet++.')
 parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
 parser.add_argument('--split', default='val', help='Dataset split. train or val. [default: val]')
 parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
@@ -116,7 +117,8 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                num_proposal=FLAGS.num_target,
                input_feature_dim=num_input_channel,
                vote_factor=FLAGS.vote_factor,
-               sampling=FLAGS.cluster_sampling)
+               sampling=FLAGS.cluster_sampling,
+               backbone=FLAGS.backbone)
 net.to(device)
 criterion = MODEL.get_loss
 

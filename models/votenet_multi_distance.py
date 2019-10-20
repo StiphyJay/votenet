@@ -18,6 +18,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 from backbone_module import Pointnet2Backbone
+from backbone_module_deep import Pointnet2BackboneDeep
+from backbone_module_deeper import Pointnet2BackboneDeeper
 from voting_module import VotingModuleMultiDistance
 from model_util_vote import VoteConfigDistance
 from proposal_module import ProposalModuleMulti
@@ -46,7 +48,7 @@ class VoteNetMultiDistance(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
                  input_feature_dim=0, num_proposal=128, vote_config=VoteConfigDistance(), 
                  sampling='sorted_fps', disable_top_n_votes=False, sorted_by_prob=False,
-                 cluster_radius=0.3, cluster_nsample=16):
+                 cluster_radius=0.3, cluster_nsample=16, backbone='standard'):
         super().__init__()
 
         self.num_class = num_class
@@ -62,7 +64,12 @@ class VoteNetMultiDistance(nn.Module):
         self.sorted_by_prob = sorted_by_prob
 
         # Backbone point feature learning
-        self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
+        if backbone == 'standard':
+            self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
+        elif backbone == 'deep':
+            self.backbone_net = Pointnet2BackboneDeep(input_feature_dim=self.input_feature_dim)
+        elif backbone == 'deeper':
+            self.backbone_net = Pointnet2BackboneDeeper(input_feature_dim=self.input_feature_dim)
 
         # Hough voting
         self.vgen = VotingModuleMultiDistance(self.vote_config, 256)
