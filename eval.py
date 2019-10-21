@@ -131,7 +131,8 @@ if CHECKPOINT_PATH is not None and os.path.isfile(CHECKPOINT_PATH):
     net.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
-    log_string("Loaded checkpoint %s (epoch: %d)"%(CHECKPOINT_PATH, epoch))
+    best_mAP = checkpoint.get('mAP', -1.0)
+    log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f)"%(CHECKPOINT_PATH, epoch, best_mAP))
 
 # Used for AP calculation
 CONFIG_DICT = {'remove_empty_box': (not FLAGS.faster_eval), 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,

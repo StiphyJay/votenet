@@ -51,7 +51,7 @@ parser.add_argument('--num_point', type=int, default=20000, help='Point Number [
 parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
 parser.add_argument('--vote_factor', type=int, default=1, help='Vote factor [default: 1]')
 parser.add_argument('--cluster_sampling', default='vote_fps', help='Sampling strategy for vote clusters: vote_fps, seed_fps, random [default: vote_fps]')
-parser.add_argument('--ap_iou_thresh', type=float, default=0.25, help='AP IoU threshold [default: 0.25]')
+parser.add_argument('--ap_iou_thresh', type=float, default=0.5, help='AP IoU threshold [default: 0.5]')
 parser.add_argument('--max_epoch', type=int, default=180, help='Epoch to run [default: 180]')
 parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='Initial learning rate [default: 0.001]')
@@ -78,7 +78,7 @@ LR_DECAY_STEPS = [int(x) for x in FLAGS.lr_decay_steps.split(',')]
 LR_DECAY_RATES = [float(x) for x in FLAGS.lr_decay_rates.split(',')]
 assert(len(LR_DECAY_STEPS)==len(LR_DECAY_RATES))
 LOG_DIR = FLAGS.log_dir
-DEFAULT_DUMP_DIR = os.path.join(BASE_DIR, os.path.basename(LOG_DIR))
+DEFAULT_DUMP_DIR = os.path.join(LOG_DIR, 'dump')
 DUMP_DIR = FLAGS.dump_dir if FLAGS.dump_dir is not None else DEFAULT_DUMP_DIR
 DEFAULT_CHECKPOINT_PATH = os.path.join(LOG_DIR, 'checkpoint.tar')
 CHECKPOINT_PATH = FLAGS.checkpoint_path if FLAGS.checkpoint_path is not None \
@@ -301,15 +301,28 @@ def evaluate_one_epoch():
     metrics_dict = ap_calculator.compute_metrics()
     for key in metrics_dict:
         log_string('eval %s: %f'%(key, metrics_dict[key]))
+    
+    # save best model according to mAP
+    global BEST_MAP
+    if metrics_dict['mAP'] > BEST_MAP:
+        BEST_MAP = metrics_dict['mAP']
+        save_dict = {'epoch': EPOCH_CNT+1, # after training one epoch, the start_epoch should be epoch+1
+                     'mAP': BEST_MAP,
+                    }
+        try: 
+            save_dict['model_state_dict'] = net.module.state_dict()
+        except:
+            save_dict['model_state_dict'] = net.state_dict()
+        torch.save(save_dict, os.path.join(LOG_DIR, 'best_eval_model.tar'))
 
     mean_loss = stat_dict['loss']/float(batch_idx+1)
     return mean_loss
 
 
 def train(start_epoch):
-    global EPOCH_CNT 
-    min_loss = 1e10
-    loss = 0
+    global EPOCH_CNT
+    global BEST_MAP
+    BEST_MAP = 0.0
     for epoch in range(start_epoch, MAX_EPOCH):
         EPOCH_CNT = epoch
         log_string('**** EPOCH %03d ****' % (epoch))
@@ -321,11 +334,10 @@ def train(start_epoch):
         np.random.seed()
         train_one_epoch()
         if EPOCH_CNT == 0 or EPOCH_CNT % 10 == 9: # Eval every 10 epochs
-            loss = evaluate_one_epoch()
+            evaluate_one_epoch()
         # Save checkpoint
         save_dict = {'epoch': epoch+1, # after training one epoch, the start_epoch should be epoch+1
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'loss': loss,
+                    'optimizer_state_dict': optimizer.state_dict()
                     }
         try: # with nn.DataParallel() the net is added as a submodule of DataParallel
             save_dict['model_state_dict'] = net.module.state_dict()
