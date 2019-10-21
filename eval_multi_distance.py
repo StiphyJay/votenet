@@ -37,12 +37,12 @@ parser.add_argument('--use_color', action='store_true', help='Use RGB color in i
 parser.add_argument('--backbone', default='standard', help='Depth of pointnet++.')
 parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
 parser.add_argument('--num_vote_heading', type=int, default=4, help='num_vote_heading for spatial discrete')
-parser.add_argument('--max_r', type=str, default='2.0,6.0', help='max_r')
+parser.add_argument('--max_r', type=str, default='5.75', help='max_r')
 parser.add_argument('--max_z', type=str, default='1.6', help='max_z')
-parser.add_argument('--disable_top_n_votes', action='store_true', help='disable_top_n_votes.')
+parser.add_argument('--enable_top_n_votes', action='store_true', help='enable_top_n_votes.')
 parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
-parser.add_argument('--sorted_by_prob', action='store_true', help='sorted_by_prob.')
+parser.add_argument('--sorted_by_score', action='store_true', help='sorted_by_score.')
 parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
 parser.add_argument('--num_target', type=int, default=256, help='Point Number [default: 256]')
 parser.add_argument('--cluster_radius', type=float, default=0.3, help='cluster_radius')
@@ -164,21 +164,25 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                input_feature_dim=num_input_channel,
                vote_config=VC,
                sampling=FLAGS.cluster_sampling,
-               disable_top_n_votes=FLAGS.disable_top_n_votes,
-               sorted_by_prob=FLAGS.sorted_by_prob,
+               disable_top_n_votes=(not FLAGS.enable_top_n_votes),
+               sorted_by_prob=(not FLAGS.sorted_by_score),
                cluster_radius=FLAGS.cluster_radius,
                cluster_nsample=FLAGS.cluster_nsample,
                backbone=FLAGS.backbone)
 net.to(device)
 criterion = MODEL.get_loss
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters())
+
 # Load checkpoint if there is any
 if CHECKPOINT_PATH is not None and os.path.isfile(CHECKPOINT_PATH):
     checkpoint = torch.load(CHECKPOINT_PATH)
     net.load_state_dict(checkpoint['model_state_dict'])
+    total_param = count_parameters(net)
     epoch = checkpoint['epoch']
     best_mAP = checkpoint['mAP']
-    log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f)"%(CHECKPOINT_PATH, epoch, best_mAP))
+    log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f, total param: %d)"%(CHECKPOINT_PATH, epoch, best_mAP, total_param))
 
 # Used for AP calculation
 CONFIG_DICT = {'remove_empty_box': (not FLAGS.faster_eval), 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,

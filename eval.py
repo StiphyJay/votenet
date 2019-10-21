@@ -122,17 +122,19 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
 net.to(device)
 criterion = MODEL.get_loss
 
-# Load the Adam optimizer
-optimizer = optim.Adam(net.parameters(), lr=0.001)
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters())
 
 # Load checkpoint if there is any
 if CHECKPOINT_PATH is not None and os.path.isfile(CHECKPOINT_PATH):
     checkpoint = torch.load(CHECKPOINT_PATH)
     net.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    total_param = count_parameters(net)
+
     epoch = checkpoint['epoch']
     best_mAP = checkpoint.get('mAP', -1.0)
-    log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f)"%(CHECKPOINT_PATH, epoch, best_mAP))
+    log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f, total param: %d)"%(CHECKPOINT_PATH, epoch, best_mAP, total_param))
 
 # Used for AP calculation
 CONFIG_DICT = {'remove_empty_box': (not FLAGS.faster_eval), 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,
