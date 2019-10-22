@@ -26,10 +26,10 @@ from ap_helper import APCalculator, parse_predictions, parse_groundtruths
 parser = argparse.ArgumentParser()
 
 # dataset
-parser.add_argument('--dataset', default='sunrgbd', help='Dataset name. sunrgbd or scannet. [default: sunrgbd]')
+parser.add_argument('--dataset', default='scannet', help='Dataset name. sunrgbd or scannet. [default: scannet]')
 parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use SUN RGB-D V2 box labels.')
 parser.add_argument('--split', default='val', help='Dataset split. train or val. [default: val]')
-parser.add_argument('--num_point', type=int, default=20000, help='Point Number [default: 20000]')
+parser.add_argument('--num_point', type=int, default=40000, help='Point Number [default: 40000]')
 parser.add_argument('--no_height', action='store_true', help='Do NOT use height signal in input.')
 parser.add_argument('--use_color', action='store_true', help='Use RGB color in input.')
 
