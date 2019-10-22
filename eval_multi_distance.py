@@ -178,7 +178,9 @@ def count_parameters(model):
 # Load checkpoint if there is any
 if CHECKPOINT_PATH is not None and os.path.isfile(CHECKPOINT_PATH):
     checkpoint = torch.load(CHECKPOINT_PATH)
-    net.load_state_dict(checkpoint['model_state_dict'])
+    cur_state = net.state_dict()
+    cur_state.update(checkpoint['model_state_dict'])
+    net.load_state_dict(cur_state)
     total_param = count_parameters(net)
     epoch = checkpoint['epoch']
     best_mAP = checkpoint['mAP']
