@@ -20,6 +20,7 @@ sys.path.append(BASE_DIR)
 from backbone_module import Pointnet2Backbone
 from backbone_module_deep import Pointnet2BackboneDeep
 from backbone_module_deeper import Pointnet2BackboneDeeper
+from backbone_module_shallow import Pointnet2BackboneShallow
 from voting_module import VotingModuleMultiDistance
 from model_util_vote import VoteConfigDistance
 from proposal_module import ProposalModuleMulti
@@ -70,6 +71,8 @@ class VoteNetMultiDistance(nn.Module):
             self.backbone_net = Pointnet2BackboneDeep(input_feature_dim=self.input_feature_dim)
         elif backbone == 'deeper':
             self.backbone_net = Pointnet2BackboneDeeper(input_feature_dim=self.input_feature_dim)
+        elif backbone == 'shallow':
+            self.backbone_net = Pointnet2BackboneShallow(input_feature_dim=self.input_feature_dim)
 
         # Hough voting
         self.vgen = VotingModuleMultiDistance(self.vote_config, 256)
