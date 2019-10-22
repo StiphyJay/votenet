@@ -123,8 +123,7 @@ class Pointnet2BackboneDeep(nn.Module):
         end_points['sa1_xyz'] = xyz
         end_points['sa1_features'] = features
 
-        xyz, features, fps_inds = self.sa2(xyz, features, inds_buf) # this fps_inds is just 0,1,...,1023
-        end_points['sa2_inds'] = fps_inds
+        xyz, features, _ = self.sa2(xyz, features, inds_buf) # this fps_inds is just 0,1,...,1023
         end_points['sa2_xyz'] = xyz
         end_points['sa2_features'] = features
 

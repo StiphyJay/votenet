@@ -71,6 +71,8 @@ class Pointnet2Backbone(nn.Module):
         self.fp1 = PointnetFPModule(mlp=[256+256,256,256])
         self.fp2 = PointnetFPModule(mlp=[256+256,256,256])
 
+        self.register_buffer('fps_inds_buf', torch.arange(self.sa2.npoint, dtype=torch.int32))
+
     def _break_up_pc(self, pc):
         xyz = pc[..., 0:3].contiguous()
         features = (
@@ -103,6 +105,7 @@ class Pointnet2Backbone(nn.Module):
         batch_size = pointcloud.shape[0]
 
         xyz, features = self._break_up_pc(pointcloud)
+        inds_buf = self.fps_inds_buf.repeat(batch_size, 1).contiguous()
 
         # --------- 4 SET ABSTRACTION LAYERS ---------
         xyz, features, fps_inds = self.sa1(xyz, features)
@@ -110,16 +113,15 @@ class Pointnet2Backbone(nn.Module):
         end_points['sa1_xyz'] = xyz
         end_points['sa1_features'] = features
 
-        xyz, features, fps_inds = self.sa2(xyz, features) # this fps_inds is just 0,1,...,1023
-        end_points['sa2_inds'] = fps_inds
+        xyz, features, _ = self.sa2(xyz, features, inds_buf) # this fps_inds is just 0,1,...,1023
         end_points['sa2_xyz'] = xyz
         end_points['sa2_features'] = features
 
-        xyz, features, fps_inds = self.sa3(xyz, features) # this fps_inds is just 0,1,...,511
+        xyz, features, _ = self.sa3(xyz, features, inds_buf[:, :self.sa3.npoint].contiguous()) # this fps_inds is just 0,1,...,511
         end_points['sa3_xyz'] = xyz
         end_points['sa3_features'] = features
 
-        xyz, features, fps_inds = self.sa4(xyz, features) # this fps_inds is just 0,1,...,255
+        xyz, features, _ = self.sa4(xyz, features, inds_buf[:, :self.sa4.npoint].contiguous()) # this fps_inds is just 0,1,...,255
         end_points['sa4_xyz'] = xyz
         end_points['sa4_features'] = features
 
