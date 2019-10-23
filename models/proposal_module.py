@@ -117,7 +117,7 @@ class ProposalModule(nn.Module):
 class ProposalModuleMulti(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
                  num_proposal, sampling, seed_feat_dim=256, vote_config=VoteConfig(),
-                 radius=0.3, nsample=16):
+                 radius=0.3, nsample=16, sorted_clustering=True):
         super().__init__() 
 
         self.num_class = num_class
@@ -141,6 +141,8 @@ class ProposalModuleMulti(nn.Module):
                 use_xyz=True,
                 normalize_xyz=True
             )
+
+        self.sorted_clustering = sorted_clustering
     
         # Object proposal/detection
         # Objectness scores (2), center residual (3),
@@ -183,7 +185,7 @@ class ProposalModuleMulti(nn.Module):
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
         elif self.sampling in ['sorted_fps', 'sorted_random']:
             vote_sorted_key = end_points['vote_sorted_key'] # (batch_size, num_seed*num_vote)
-            _, vote_best_n_inds = torch.topk(vote_sorted_key, self.vote_config.best_n_votes, dim=1) # (batch_size, best_n)
+            _, vote_best_n_inds = torch.topk(vote_sorted_key, self.vote_config.best_n_votes, dim=1, sorted=self.sorted_clustering) # (batch_size, best_n)
             end_points['vote_best_n_inds'] = vote_best_n_inds
             vote_best_n_inds_expand = vote_best_n_inds.unsqueeze(-1).repeat(1,1,3)
             new_vote_xyz = torch.gather(xyz, 1, vote_best_n_inds_expand).contiguous()

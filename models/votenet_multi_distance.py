@@ -49,7 +49,7 @@ class VoteNetMultiDistance(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
                  input_feature_dim=0, num_proposal=128, vote_config=VoteConfigDistance(), 
                  sampling='sorted_fps', disable_top_n_votes=False, sorted_by_prob=False,
-                 cluster_radius=0.3, cluster_nsample=16, backbone='standard'):
+                 cluster_radius=0.3, cluster_nsample=16, backbone='standard', sorted_clustering=True):
         super().__init__()
 
         self.num_class = num_class
@@ -81,7 +81,7 @@ class VoteNetMultiDistance(nn.Module):
         self.pnet = ProposalModuleMulti(num_class, num_heading_bin, num_size_cluster,
                                         mean_size_arr, num_proposal, sampling, 
                                         vote_config=self.vote_config, radius=cluster_radius,
-                                        nsample=cluster_nsample)
+                                        nsample=cluster_nsample, sorted_clustering=sorted_clustering)
 
     def forward(self, inputs):
         """ Forward pass of the network

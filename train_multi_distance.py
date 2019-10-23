@@ -60,6 +60,7 @@ parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
 parser.add_argument('--sorted_by_score', action='store_true', help='sorted_by_score.')
 parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
+parser.add_argument('--disable_sorted_clustering', action='store_true', help='disable_sorted_clustering.')
 parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
 parser.add_argument('--cluster_radius', type=float, default=0.3, help='cluster_radius')
 parser.add_argument('--cluster_nsample', type=int, default=16, help='cluster_nsample')
@@ -208,7 +209,8 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                sorted_by_prob=(not FLAGS.sorted_by_score),
                cluster_radius=FLAGS.cluster_radius,
                cluster_nsample=FLAGS.cluster_nsample,
-               backbone=FLAGS.backbone)
+               backbone=FLAGS.backbone,
+               sorted_clustering=(not FLAGS.disable_sorted_clustering))
 
 if torch.cuda.device_count() > 1:
   log_string("Let's use %d GPUs!" % (torch.cuda.device_count()))
