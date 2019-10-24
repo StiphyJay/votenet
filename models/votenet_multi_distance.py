@@ -49,7 +49,8 @@ class VoteNetMultiDistance(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
                  input_feature_dim=0, num_proposal=128, vote_config=VoteConfigDistance(), 
                  sampling='sorted_fps', disable_top_n_votes=False, sorted_by_prob=False,
-                 cluster_radius=0.3, cluster_nsample=16, backbone='standard', sorted_clustering=True):
+                 cluster_radius=0.3, cluster_nsample=16, backbone='standard', sorted_clustering=True,
+                 feature_attention=None):
         super().__init__()
 
         self.num_class = num_class
@@ -63,6 +64,7 @@ class VoteNetMultiDistance(nn.Module):
         self.sampling=sampling
         self.disable_top_n_votes = disable_top_n_votes
         self.sorted_by_prob = sorted_by_prob
+        self.feature_attention = feature_attention
 
         # Backbone point feature learning
         if backbone == 'standard':
@@ -77,9 +79,11 @@ class VoteNetMultiDistance(nn.Module):
         # Hough voting
         self.vgen = VotingModuleMultiDistance(self.vote_config, 256)
 
+        seed_feat_dim = 257 if self.feature_attention == 'cat' else 256
+
         # Vote aggregation and detection  # TODO: if to change num_proposal
         self.pnet = ProposalModuleMulti(num_class, num_heading_bin, num_size_cluster,
-                                        mean_size_arr, num_proposal, sampling, 
+                                        mean_size_arr, num_proposal, sampling, seed_feat_dim=seed_feat_dim,
                                         vote_config=self.vote_config, radius=cluster_radius,
                                         nsample=cluster_nsample, sorted_clustering=sorted_clustering)
 
@@ -119,8 +123,16 @@ class VoteNetMultiDistance(nn.Module):
 
         if self.disable_top_n_votes:
             end_points['vote_xyz'] = xyz.view(batch_size, -1, 3).contiguous()
-            end_points['vote_features'] = features.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous()
             end_points['vote_sorted_key'] = vote_sorted_key.view(batch_size, -1).contiguous()
+            
+            features = features.view(batch_size, -1, vote_feature_dim)
+            if self.feature_attention == 'cat':
+                features = torch.cat((features, end_points['vote_sorted_key'].unsqueeze(2)), dim=2)
+            elif self.feature_attention == 'norm':
+                assert self.sorted_by_prob
+                features *= end_points['vote_sorted_key'].unsqueeze(2)
+
+            end_points['vote_features'] = features.transpose(1, 2).contiguous()
         else:
             # choose top_n_votes
             top_n_sorted_key, top_n_spatial_ind = torch.topk(vote_sorted_key, self.vote_config.top_n_votes, dim=2) # (batch_size, num_seed, num_vote)
