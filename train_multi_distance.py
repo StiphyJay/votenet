@@ -52,6 +52,7 @@ parser.add_argument('--use_color', action='store_true', help='Use RGB color in i
 # network
 parser.add_argument('--backbone', default='standard', help='Depth of pointnet++.')
 parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
+parser.add_argument('--no_feature_refine', action='store_true', help='no_feature_refine.')
 parser.add_argument('--num_vote_heading', type=int, default=4, help='num_vote_heading for spatial discrete')
 parser.add_argument('--max_r', type=str, default='5.75', help='max_r')
 parser.add_argument('--max_z', type=str, default='1.6', help='max_z')
@@ -192,11 +193,15 @@ TEST_DATALOADER = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE,
 print(len(TRAIN_DATALOADER), len(TEST_DATALOADER))
 
 # Init the model and optimzier
-MODEL = importlib.import_module('votenet_multi_distance') # import network module
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_input_channel = int(FLAGS.use_color)*3 + int(not FLAGS.no_height)*1
 
-Detector = MODEL.VoteNetMultiDistance
+if FLAGS.no_feature_refine:
+    MODEL = importlib.import_module('votenet_multi_distance_no_feature_refine') # import network module
+    Detector = MODEL.VoteNetMultiDistance_no_feature_refine
+else:
+    MODEL = importlib.import_module('votenet_multi_distance') # import network module
+    Detector = MODEL.VoteNetMultiDistance
 
 net = Detector(num_class=DATASET_CONFIG.num_class,
                num_heading_bin=DATASET_CONFIG.num_heading_bin,
