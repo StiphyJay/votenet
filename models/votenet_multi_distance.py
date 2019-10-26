@@ -116,8 +116,8 @@ class VoteNetMultiDistance(nn.Module):
         
         xyz, features, spatial_score = self.vgen(xyz, features)
         vote_feature_dim = features.size(-1)
-        features_norm = torch.norm(features, p=2, dim=1)
-        features = features.div(features_norm.unsqueeze(1))
+        features_norm = torch.norm(features, p=2, dim=3)
+        features = features.div(features_norm.unsqueeze(3))
         end_points['vote_spatial_score'] = spatial_score # (batch_size, num_seed, num_spatial_cls)
         vote_sorted_key = F.softmax(spatial_score, dim=2) if self.sorted_by_prob else spatial_score
 
