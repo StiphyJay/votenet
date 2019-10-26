@@ -38,10 +38,10 @@ parser.add_argument('--ap_iou_thresholds', default='0.25,0.5', help='A list of A
 parser.add_argument('--no_height', action='store_true', help='Do NOT use height signal in input.')
 parser.add_argument('--use_color', action='store_true', help='Use RGB color in input.')
 parser.add_argument('--use_sunrgbd_v2', action='store_true', help='Use SUN RGB-D V2 box labels.')
-parser.add_argument('--use_3d_nms', action='store_true', help='Use 3D NMS instead of 2D NMS.')
-parser.add_argument('--use_cls_nms', action='store_true', help='Use per class NMS.')
+parser.add_argument('--use_2d_nms', action='store_true', help='Use 2D NMS instead of 3D NMS.')
+parser.add_argument('--disable_cls_nms', action='store_true', help='Not use per class NMS.')
 parser.add_argument('--use_old_type_nms', action='store_true', help='Use old type of NMS, IoBox2Area.')
-parser.add_argument('--per_class_proposal', action='store_true', help='Duplicate each proposal num_class times.')
+parser.add_argument('--not_class_proposal', action='store_true', help='Duplicate each proposal num_class times.')
 parser.add_argument('--nms_iou', type=float, default=0.25, help='NMS IoU threshold. [default: 0.25]')
 parser.add_argument('--conf_thresh', type=float, default=0.05, help='Filter out predictions with obj prob less than it. [default: 0.05]')
 parser.add_argument('--faster_eval', action='store_true', help='Faster evaluation by skippling empty bounding box removal.')
@@ -52,8 +52,8 @@ parser.add_argument('--obj_pos_prob', type=float, default=0.5, help='obj_pos_pro
 parser.add_argument('--obj_neg_prob', type=float, default=0.5, help='obj_neg_prob')
 FLAGS = parser.parse_args()
 
-if FLAGS.use_cls_nms:
-    assert(FLAGS.use_3d_nms)
+if (not FLAGS.disable_cls_nms):
+    assert(not FLAGS.use_2d_nms)
 
 # ------------------------------------------------------------------------- GLOBAL CONFIG BEG
 BATCH_SIZE = FLAGS.batch_size
@@ -139,8 +139,8 @@ if CHECKPOINT_PATH is not None and os.path.isfile(CHECKPOINT_PATH):
     log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f, total param: %d)"%(CHECKPOINT_PATH, epoch, best_mAP, total_param))
 
 # Used for AP calculation
-CONFIG_DICT = {'remove_empty_box': (not FLAGS.faster_eval), 'use_3d_nms': FLAGS.use_3d_nms, 'nms_iou': FLAGS.nms_iou,
-    'use_old_type_nms': FLAGS.use_old_type_nms, 'cls_nms': FLAGS.use_cls_nms, 'per_class_proposal': FLAGS.per_class_proposal,
+CONFIG_DICT = {'remove_empty_box': (not FLAGS.faster_eval), 'use_3d_nms': (not FLAGS.use_2d_nms), 'nms_iou': FLAGS.nms_iou,
+    'use_old_type_nms': FLAGS.use_old_type_nms, 'cls_nms': (not FLAGS.disable_cls_nms), 'per_class_proposal': (not FLAGS.not_class_proposal),
     'conf_thresh': FLAGS.conf_thresh, 'dataset_config':DATASET_CONFIG}
 # ------------------------------------------------------------------------- GLOBAL CONFIG END
 
