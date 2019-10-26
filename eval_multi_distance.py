@@ -44,7 +44,7 @@ parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
 parser.add_argument('--sorted_by_score', action='store_true', help='sorted_by_score.')
 parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
-parser.add_argument('--disable_sorted_clustering', action='store_true', help='disable_sorted_clustering.')
+parser.add_argument('--enable_sorted_clustering', action='store_true', help='enable_sorted_clustering.')
 parser.add_argument('--feature_attention', type=str, default=None, help='feature_attention')
 parser.add_argument('--num_target', type=int, default=256, help='Point Number [default: 256]')
 parser.add_argument('--cluster_radius', type=float, default=0.3, help='cluster_radius')
@@ -171,7 +171,7 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                cluster_radius=FLAGS.cluster_radius,
                cluster_nsample=FLAGS.cluster_nsample,
                backbone=FLAGS.backbone,
-               sorted_clustering=(not FLAGS.disable_sorted_clustering),
+               sorted_clustering=FLAGS.enable_sorted_clustering,
                feature_attention=FLAGS.feature_attention)
 net.to(device)
 criterion = MODEL.get_loss
