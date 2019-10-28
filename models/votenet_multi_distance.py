@@ -50,7 +50,7 @@ class VoteNetMultiDistance(nn.Module):
                  input_feature_dim=0, num_proposal=128, vote_config=VoteConfigDistance(), 
                  sampling='sorted_fps', disable_top_n_votes=False, sorted_by_prob=False,
                  cluster_radius=0.3, cluster_nsample=16, backbone='standard', sorted_clustering=True,
-                 feature_attention=None):
+                 feature_attention=None, no_feature_norm=False):
         super().__init__()
 
         self.num_class = num_class
@@ -65,6 +65,7 @@ class VoteNetMultiDistance(nn.Module):
         self.disable_top_n_votes = disable_top_n_votes
         self.sorted_by_prob = sorted_by_prob
         self.feature_attention = feature_attention
+        self.no_feature_norm = no_feature_norm
 
         # Backbone point feature learning
         if backbone == 'standard':
@@ -116,8 +117,9 @@ class VoteNetMultiDistance(nn.Module):
         
         xyz, features, spatial_score = self.vgen(xyz, features)
         vote_feature_dim = features.size(-1)
-        features_norm = torch.norm(features, p=2, dim=3)
-        features = features.div(features_norm.unsqueeze(3))
+        if (not self.no_feature_norm):
+            features_norm = torch.norm(features, p=2, dim=3)
+            features = features.div(features_norm.unsqueeze(3))
         end_points['vote_spatial_score'] = spatial_score # (batch_size, num_seed, num_spatial_cls)
         vote_sorted_key = F.softmax(spatial_score, dim=2) if self.sorted_by_prob else spatial_score
 
