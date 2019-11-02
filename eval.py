@@ -59,7 +59,7 @@ if (not FLAGS.disable_cls_nms):
 BATCH_SIZE = FLAGS.batch_size
 NUM_POINT = FLAGS.num_point
 DUMP_DIR = FLAGS.dump_dir
-CHECKPOINT_PATH = FLAGS.checkpoint_path
+CHECKPOINT_PATH = FLAGS.ckpt
 assert(CHECKPOINT_PATH is not None)
 FLAGS.DUMP_DIR = DUMP_DIR
 AP_IOU_THRESHOLDS = [float(x) for x in FLAGS.ap_iou_thresholds.split(',')]
