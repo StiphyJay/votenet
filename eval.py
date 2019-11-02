@@ -27,7 +27,7 @@ parser.add_argument('--model', default='votenet', help='Model file name [default
 parser.add_argument('--backbone', default='standard', help='Depth of pointnet++.')
 parser.add_argument('--dataset', default='scannet', help='Dataset name. sunrgbd or scannet. [default: scannet]')
 parser.add_argument('--split', default='val', help='Dataset split. train or val. [default: val]')
-parser.add_argument('--checkpoint_path', default=None, help='Model checkpoint path [default: None]')
+parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
 parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
 parser.add_argument('--num_point', type=int, default=40000, help='Point Number [default: 40000]')
 parser.add_argument('--num_target', type=int, default=256, help='Point Number [default: 256]')
