@@ -72,6 +72,7 @@ parser.add_argument('--vote_cls_loss_weight_decay_steps', default=None, type=str
 parser.add_argument('--vote_cls_loss_weight_decay_rates', default=None, type=str, help='vote_cls_loss_weight_decay_rates')
 
 # output
+parser.add_argument('--dump_results', action='store_true', help='dump_results')
 parser.add_argument('--dump_dir', default=None, help='Dump dir to save sample outputs [default: None]')
 
 # statistics
@@ -299,7 +300,7 @@ def evaluate_one_epoch():
         end_points['scan_name'] = [TEST_DATASET.scan_names[scan_idx] for scan_idx in end_points['scan_idx']]
     
         # Dump evaluation results for visualization
-        if batch_idx == 0:
+        if FLAGS.dump_results:
             MODEL.dump_results(end_points, DUMP_DIR, DATASET_CONFIG)
 
     # Log statistics
