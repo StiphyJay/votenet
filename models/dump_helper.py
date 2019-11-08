@@ -61,15 +61,15 @@ def dump_results(end_points, dump_dir, config, inference_switch=False):
         objectness_prob = softmax(objectness_scores[i,:,:])[:,1] # (K,)
 
         # Dump various point clouds
-        pc_util.write_ply(pc, os.path.join(dump_dir, '%06d_pc.ply'%(idx_beg+i)))
-        pc_util.write_ply(seed_xyz[i,:,:], os.path.join(dump_dir, '%06d_seed_pc.ply'%(idx_beg+i)))
+        pc_util.write_ply(pc, os.path.join(dump_dir, '{}_pc.ply'.format(end_points['scan_name'][i])))
+        pc_util.write_ply(seed_xyz[i,:,:], os.path.join(dump_dir, '{}_seed_pc.ply'.format(end_points['scan_name'][i])))
         if 'vote_xyz' in end_points:
-            pc_util.write_ply(end_points['vote_xyz'][i,:,:], os.path.join(dump_dir, '%06d_vgen_pc.ply'%(idx_beg+i)))
-            pc_util.write_ply(aggregated_vote_xyz[i,:,:], os.path.join(dump_dir, '%06d_aggregated_vote_pc.ply'%(idx_beg+i)))
-            pc_util.write_ply(aggregated_vote_xyz[i,:,:], os.path.join(dump_dir, '%06d_aggregated_vote_pc.ply'%(idx_beg+i)))
-        pc_util.write_ply(pred_center[i,:,0:3], os.path.join(dump_dir, '%06d_proposal_pc.ply'%(idx_beg+i)))
+            pc_util.write_ply(end_points['vote_xyz'][i,:,:], os.path.join(dump_dir, '{}_vgen_pc.ply'.format(end_points['scan_name'][i])))
+            pc_util.write_ply(aggregated_vote_xyz[i,:,:], os.path.join(dump_dir, '{}_aggregated_vote_pc.ply'.format(end_points['scan_name'][i])))
+            pc_util.write_ply(aggregated_vote_xyz[i,:,:], os.path.join(dump_dir, '{}_aggregated_vote_pc.ply'.format(end_points['scan_name'][i])))
+        pc_util.write_ply(pred_center[i,:,0:3], os.path.join(dump_dir, '{}_proposal_pc.ply'.format(end_points['scan_name'][i])))
         if np.sum(objectness_prob>DUMP_CONF_THRESH)>0:
-            pc_util.write_ply(pred_center[i,objectness_prob>DUMP_CONF_THRESH,0:3], os.path.join(dump_dir, '%06d_confident_proposal_pc.ply'%(idx_beg+i)))
+            pc_util.write_ply(pred_center[i,objectness_prob>DUMP_CONF_THRESH,0:3], os.path.join(dump_dir, '{}_confident_proposal_pc.ply'.format(end_points['scan_name'][i])))
 
         # Dump predicted bounding boxes
         if np.sum(objectness_prob>DUMP_CONF_THRESH)>0:
@@ -81,10 +81,10 @@ def dump_results(end_points, dump_dir, config, inference_switch=False):
                 obbs.append(obb)
             if len(obbs)>0:
                 obbs = np.vstack(tuple(obbs)) # (num_proposal, 7)
-                pc_util.write_oriented_bbox(obbs[objectness_prob>DUMP_CONF_THRESH,:], os.path.join(dump_dir, '%06d_pred_confident_bbox.ply'%(idx_beg+i)))
-                pc_util.write_oriented_bbox(obbs[np.logical_and(objectness_prob>DUMP_CONF_THRESH, pred_mask[i,:]==1),:], os.path.join(dump_dir, '%06d_pred_confident_nms_bbox.ply'%(idx_beg+i)))
-                pc_util.write_oriented_bbox(obbs[pred_mask[i,:]==1,:], os.path.join(dump_dir, '%06d_pred_nms_bbox.ply'%(idx_beg+i)))
-                pc_util.write_oriented_bbox(obbs, os.path.join(dump_dir, '%06d_pred_bbox.ply'%(idx_beg+i)))
+                pc_util.write_oriented_bbox(obbs[objectness_prob>DUMP_CONF_THRESH,:], os.path.join(dump_dir, '{}_pred_confident_bbox.ply'.format(end_points['scan_name'][i])))
+                pc_util.write_oriented_bbox(obbs[np.logical_and(objectness_prob>DUMP_CONF_THRESH, pred_mask[i,:]==1),:], os.path.join(dump_dir, '{}_pred_confident_nms_bbox.ply'.format(end_points['scan_name'][i])))
+                pc_util.write_oriented_bbox(obbs[pred_mask[i,:]==1,:], os.path.join(dump_dir, '{}_pred_nms_bbox.ply'.format(end_points['scan_name'][i])))
+                pc_util.write_oriented_bbox(obbs, os.path.join(dump_dir, '{}_pred_bbox.ply'.format(end_points['scan_name'][i])))
 
     # Return if it is at inference time. No dumping of groundtruths
     if inference_switch:
@@ -102,11 +102,11 @@ def dump_results(end_points, dump_dir, config, inference_switch=False):
 
     for i in range(batch_size):
         if np.sum(objectness_label[i,:])>0:
-            pc_util.write_ply(pred_center[i,objectness_label[i,:]>0,0:3], os.path.join(dump_dir, '%06d_gt_positive_proposal_pc.ply'%(idx_beg+i)))
+            pc_util.write_ply(pred_center[i,objectness_label[i,:]>0,0:3], os.path.join(dump_dir, '{}_gt_positive_proposal_pc.ply'.format(end_points['scan_name'][i])))
         if np.sum(objectness_mask[i,:])>0:
-            pc_util.write_ply(pred_center[i,objectness_mask[i,:]>0,0:3], os.path.join(dump_dir, '%06d_gt_mask_proposal_pc.ply'%(idx_beg+i)))
-        pc_util.write_ply(gt_center[i,:,0:3], os.path.join(dump_dir, '%06d_gt_centroid_pc.ply'%(idx_beg+i)))
-        pc_util.write_ply_color(pred_center[i,:,0:3], objectness_label[i,:], os.path.join(dump_dir, '%06d_proposal_pc_objectness_label.obj'%(idx_beg+i)))
+            pc_util.write_ply(pred_center[i,objectness_mask[i,:]>0,0:3], os.path.join(dump_dir, '{}_gt_mask_proposal_pc.ply'.format(end_points['scan_name'][i])))
+        pc_util.write_ply(gt_center[i,:,0:3], os.path.join(dump_dir, '{}_gt_centroid_pc.ply'.format(end_points['scan_name'][i])))
+        pc_util.write_ply_color(pred_center[i,:,0:3], objectness_label[i,:], os.path.join(dump_dir, '{}_proposal_pc_objectness_label.obj'.format(end_points['scan_name'][i])))
 
         # Dump GT bounding boxes
         obbs = []
@@ -117,12 +117,12 @@ def dump_results(end_points, dump_dir, config, inference_switch=False):
             obbs.append(obb)
         if len(obbs)>0:
             obbs = np.vstack(tuple(obbs)) # (num_gt_objects, 7)
-            pc_util.write_oriented_bbox(obbs, os.path.join(dump_dir, '%06d_gt_bbox.ply'%(idx_beg+i)))
+            pc_util.write_oriented_bbox(obbs, os.path.join(dump_dir, '{}_gt_bbox.ply'.format(end_points['scan_name'][i])))
 
     # OPTIONALL, also dump prediction and gt details
     if 'batch_pred_map_cls' in end_points:
         for ii in range(batch_size):
-            fout = open(os.path.join(dump_dir, '%06d_pred_map_cls.txt'%(ii)), 'w')
+            fout = open(os.path.join(dump_dir, '{}_pred_map_cls.txt'.format(end_points['scan_name'][ii])), 'w')
             for t in end_points['batch_pred_map_cls'][ii]:
                 fout.write(str(t[0])+' ')
                 fout.write(",".join([str(x) for x in list(t[1].flatten())]))
@@ -131,7 +131,7 @@ def dump_results(end_points, dump_dir, config, inference_switch=False):
             fout.close()
     if 'batch_gt_map_cls' in end_points:
         for ii in range(batch_size):
-            fout = open(os.path.join(dump_dir, '%06d_gt_map_cls.txt'%(ii)), 'w')
+            fout = open(os.path.join(dump_dir, '{}_gt_map_cls.txt'.format(end_points['scan_name'][ii])), 'w')
             for t in end_points['batch_gt_map_cls'][ii]:
                 fout.write(str(t[0])+' ')
                 fout.write(",".join([str(x) for x in list(t[1].flatten())]))

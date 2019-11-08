@@ -230,7 +230,10 @@ def evaluate_one_epoch():
         batch_gt_map_cls = parse_groundtruths(end_points, CONFIG_DICT) 
         for ap_calculator in ap_calculator_list:
             ap_calculator.step(batch_pred_map_cls, batch_gt_map_cls)
-    
+
+        # add scan names to end_points for visualization
+        end_points['scan_name'] = [TEST_DATASET.scan_names[scan_idx] for scan_idx in end_points['scan_idx']]
+        
         # Dump evaluation results for visualization
         if batch_idx == 0:
             MODEL.dump_results(end_points, DUMP_DIR, DATASET_CONFIG)
