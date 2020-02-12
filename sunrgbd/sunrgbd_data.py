@@ -75,9 +75,9 @@ def data_viz(data_dir, dump_dir=os.path.join(BASE_DIR, 'data_viz_dump')):
     ''' Examine and visualize SUN RGB-D data. '''
     sunrgbd = sunrgbd_object(data_dir)
     idxs = np.array(range(1,len(sunrgbd)+1))
-    np.random.seed(0)
-    np.random.shuffle(idxs)
-    for idx in range(len(sunrgbd)):
+    #np.random.seed(0)
+    #np.random.shuffle(idxs)
+    for idx in range(3890, len(sunrgbd)):
         data_idx = idxs[idx]
         print('-'*10, 'data index: ', data_idx)
         pc = sunrgbd.get_depth(data_idx)
@@ -97,12 +97,15 @@ def data_viz(data_dir, dump_dir=os.path.join(BASE_DIR, 'data_viz_dump')):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) 
         for i in range(uv.shape[0]):
             depth = d[i]
-            color = cmap[int(120.0/depth),:]
+            color = cmap[int(120.0/depth),:] if int(120.0/depth) < 256 else cmap[255,:]
             cv2.circle(img, (int(np.round(uv[i,0])), int(np.round(uv[i,1]))), 2,
                 color=tuple(color), thickness=-1)
         if not os.path.exists(dump_dir):
             os.mkdir(dump_dir)
-        Image.fromarray(img).save(os.path.join(dump_dir,'img_depth.jpg'))
+        cur_dump_dir = os.path.join(dump_dir, '%06d'%(data_idx))
+        if not os.path.exists(cur_dump_dir):
+            os.mkdir(cur_dump_dir)
+        Image.fromarray(img).save(os.path.join(cur_dump_dir,'%06d_img_depth.jpg'%(data_idx)))
         
         # Load box labels
         objects = sunrgbd.get_label_objects(data_idx)
@@ -117,14 +120,14 @@ def data_viz(data_dir, dump_dir=os.path.join(BASE_DIR, 'data_viz_dump')):
             cv2.putText(img, '%d %s'%(i,obj.classname), (max(int(obj.xmin),15),
                 max(int(obj.ymin),15)), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                 (255,0,0), 2)
-        Image.fromarray(img).save(os.path.join(dump_dir, 'img_box2d.jpg'))
+        Image.fromarray(img).save(os.path.join(cur_dump_dir, '%06d_img_box2d.jpg'%(data_idx)))
        
         # Dump OBJ files for the colored point cloud 
         for num_point in [10000,20000,40000,80000]:
             sampled_pcrgb = pc_util.random_sampling(pc, num_point)
             pc_util.write_ply_rgb(sampled_pcrgb[:,0:3],
                 (sampled_pcrgb[:,3:]*256).astype(np.int8),
-                os.path.join(dump_dir, 'pcrgb_%dk.obj'%(num_point//1000)))
+                os.path.join(cur_dump_dir, '%06d_pcrgb_%dk.obj'%(data_idx, num_point//1000)))
         # Dump OBJ files for 3D bounding boxes
         # l,w,h correspond to dx,dy,dz
         # heading angle is from +X rotating towards -Y
@@ -143,7 +146,7 @@ def data_viz(data_dir, dump_dir=os.path.join(BASE_DIR, 'data_viz_dump')):
         if len(oriented_boxes)>0:
             oriented_boxes = np.vstack(tuple(oriented_boxes))
             pc_util.write_oriented_bbox(oriented_boxes,
-                os.path.join(dump_dir, 'obbs.ply'))
+                os.path.join(cur_dump_dir, '%06d_obbs.ply'%(data_idx)))
         else:
             print('-'*30)
             continue
@@ -161,12 +164,12 @@ def data_viz(data_dir, dump_dir=os.path.join(BASE_DIR, 'data_viz_dump')):
         pc_ori3d = np.concatenate(ori3d, 0)
         print(pc_box3d.shape)
         print(pc_ori3d.shape)
-        pc_util.write_ply(pc_box3d, os.path.join(dump_dir, 'box3d_corners.ply'))
-        pc_util.write_ply(pc_ori3d, os.path.join(dump_dir, 'box3d_ori.ply'))
+        pc_util.write_ply(pc_box3d, os.path.join(cur_dump_dir, '%06d_box3d_corners.ply'%(data_idx)))
+        pc_util.write_ply(pc_ori3d, os.path.join(cur_dump_dir, '%06d_box3d_ori.ply'%(data_idx)))
         print('-'*30)
-        print('Point clouds and bounding boxes saved to PLY files under %s'%(dump_dir))
-        print('Type anything to continue to the next sample...')
-        input()
+        print('Point clouds and bounding boxes saved to PLY files under %s'%(cur_dump_dir))
+        #print('Type anything to continue to the next sample...')
+        #input()
 
 def extract_sunrgbd_data(idx_filename, split, output_folder, num_point=20000,
     type_whitelist=DEFAULT_TYPE_WHITELIST,
@@ -306,13 +309,14 @@ def get_box3d_dim_statistics(idx_filename,
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--viz', action='store_true', help='Run data visualization.')
+    parser.add_argument('--dump_dir', type=str, default=None, help='Run data visualization.')
     parser.add_argument('--compute_median_size', action='store_true', help='Compute median 3D bounding box sizes for each class.')
     parser.add_argument('--gen_v1_data', action='store_true', help='Generate V1 dataset.')
     parser.add_argument('--gen_v2_data', action='store_true', help='Generate V2 dataset.')
     args = parser.parse_args()
 
     if args.viz:
-        data_viz(os.path.join(BASE_DIR, 'sunrgbd_trainval'))
+        data_viz(os.path.join(BASE_DIR, 'sunrgbd_trainval'), args.dump_dir)
         exit()
 
     if args.compute_median_size:

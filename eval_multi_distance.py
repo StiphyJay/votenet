@@ -196,8 +196,11 @@ if CHECKPOINT_PATH is not None and os.path.isfile(CHECKPOINT_PATH):
     net.load_state_dict(cur_state)
     total_param = count_parameters(net)
     epoch = checkpoint['epoch']
-    best_mAP = checkpoint['mAP']
-    log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f, total param: %d)"%(CHECKPOINT_PATH, epoch, best_mAP, total_param))
+    if 'mAP' in checkpoint.keys():
+        best_mAP = checkpoint['mAP']
+        log_string("Loaded checkpoint %s (epoch: %d, best eval mAP@0.5: %f, total param: %d)"%(CHECKPOINT_PATH, epoch, best_mAP, total_param))
+    else:
+        log_string("Loaded checkpoint %s (epoch: %d, total param: %d)"%(CHECKPOINT_PATH, epoch, total_param))
 
 # Used for AP calculation
 CONFIG_DICT = {'remove_empty_box': (not FLAGS.faster_eval), 'use_3d_nms': (not FLAGS.use_2d_nms), 'nms_iou': FLAGS.nms_iou,
@@ -228,6 +231,9 @@ def evaluate_one_epoch():
         for iou_thresh in AP_IOU_THRESHOLDS]
     vote_cls_loss_weight = get_current_vote_cls_loss_weight(epoch)
     net.eval() # set model to eval mode (for bn and dp)
+
+    max_multi_votes = 0
+
     for batch_idx, batch_data_label in enumerate(TEST_DATALOADER):
         if batch_idx % 10 == 0:
             print('Eval batch: %d'%(batch_idx))
@@ -247,6 +253,9 @@ def evaluate_one_epoch():
             assert(key not in end_points)
             end_points[key] = batch_data_label[key]
         loss, end_points = criterion(end_points, DATASET_CONFIG)
+
+        if end_points['max_multi_votes'] > max_multi_votes:
+            max_multi_votes = end_points['max_multi_votes']
 
         if FLAGS.compute_false_stat:
             batch_size = float(end_points['objectness_scores'].size(0))
@@ -290,6 +299,9 @@ def evaluate_one_epoch():
             if ('loss' in key or 'acc' in key or 'ratio' in key) and key != 'vote_cls_loss_weight':
                 if key not in stat_dict: stat_dict[key] = 0
                 stat_dict[key] += end_points[key].item()
+            if 'hist' in key:
+                if key not in stat_dict: stat_dict[key] = 0
+                stat_dict[key] += end_points[key]
 
         batch_pred_map_cls = parse_predictions(end_points, CONFIG_DICT) 
         batch_gt_map_cls = parse_groundtruths(end_points, CONFIG_DICT) 
@@ -305,7 +317,13 @@ def evaluate_one_epoch():
 
     # Log statistics
     for key in sorted(stat_dict.keys()):
-        log_string('eval mean %s: %f'%(key, stat_dict[key]/(float(batch_idx+1))))
+        if 'hist' not in key:
+            log_string('eval mean %s: %f'%(key, stat_dict[key]/(float(batch_idx+1))))
+        else:
+            temp = stat_dict[key]/(float(batch_idx+1))
+            log_string('eval mean {}: {}'.format(key, temp.tolist()))
+
+    log_string('eval max multi votes: {}'.format(max_multi_votes))
 
     # Evaluate average precision
     for i, ap_calculator in enumerate(ap_calculator_list):
