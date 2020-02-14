@@ -153,6 +153,8 @@ num_input_channel = int(FLAGS.use_color)*3 + int(not FLAGS.no_height)*1
 
 if FLAGS.model == 'boxnet':
     Detector = MODEL.BoxNet
+elif FLAGS.model == 'votenet_var':
+    Detector = MODEL.VoteNetVar
 else:
     Detector = MODEL.VoteNet
 

@@ -31,7 +31,7 @@ def huber_loss(error, delta=1.0):
     loss = 0.5 * quadratic**2 + delta * linear
     return loss
 
-def nn_distance(pc1, pc2, l1smooth=False, delta=1.0, l1=False):
+def nn_distance(pc1, pc2, l1smooth=False, delta=1.0, l1=False, ifsum=True):
     """
     Input:
         pc1: (B,N,C) torch tensor
@@ -46,18 +46,34 @@ def nn_distance(pc1, pc2, l1smooth=False, delta=1.0, l1=False):
     """
     N = pc1.shape[1]
     M = pc2.shape[1]
+    C = pc1.shape[2]
     pc1_expand_tile = pc1.unsqueeze(2).repeat(1,1,M,1)
     pc2_expand_tile = pc2.unsqueeze(1).repeat(1,N,1,1)
     pc_diff = pc1_expand_tile - pc2_expand_tile
     
-    if l1smooth:
-        pc_dist = torch.sum(huber_loss(pc_diff, delta), dim=-1) # (B,N,M)
-    elif l1:
-        pc_dist = torch.sum(torch.abs(pc_diff), dim=-1) # (B,N,M)
+    if ifsum:
+        if l1smooth:
+            pc_dist = torch.sum(huber_loss(pc_diff, delta), dim=-1) # (B,N,M)
+        elif l1:
+            pc_dist = torch.sum(torch.abs(pc_diff), dim=-1) # (B,N,M)
+        else:
+            pc_dist = torch.sum(pc_diff**2, dim=-1) # (B,N,M)
+        dist1, idx1 = torch.min(pc_dist, dim=2) # (B,N)
+        dist2, idx2 = torch.min(pc_dist, dim=1) # (B,M)
     else:
-        pc_dist = torch.sum(pc_diff**2, dim=-1) # (B,N,M)
-    dist1, idx1 = torch.min(pc_dist, dim=2) # (B,N)
-    dist2, idx2 = torch.min(pc_dist, dim=1) # (B,M)
+        if l1smooth:
+            pc_dist = huber_loss(pc_diff, delta) # (B,N,M,C)
+        elif l1:
+            pc_dist = torch.abs(pc_diff) # (B,N,M,C)
+        else:
+            pc_dist = pc_diff**2 # (B,N,M,C)
+        pc_dist_sum = torch.sum(pc_dist, dim=-1)
+        _, idx1 = torch.min(pc_dist_sum, dim=2, keepdim=True) # (B,N,1)
+        _, idx2 = torch.min(pc_dist_sum, dim=1, keepdim=True) # (B,1,M)
+        idx1 = idx1.unsqueeze(-1).repeat(1, 1, 1, C) # (B,N,1,C)
+        dist1 = torch.gather(pc_dist, 2, idx1).squeeze().contiguous() # (B,N,C)
+        idx2 = idx2.unsqueeze(-1).repeat(1, 1, 1, C) #(B,1,M,C) 
+        dist2 = torch.gather(pc_dist, 1, idx2).squeeze().contiguous() # (B,M,C)
     return dist1, idx1, dist2, idx2
 
 def demo_nn_distance():
