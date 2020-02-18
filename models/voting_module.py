@@ -215,7 +215,7 @@ class VotingModuleMultiDistance(nn.Module):
         self.register_buffer('start_theta', torch.arange(self.num_vote_heading, dtype=torch.float32) * 2 * self.config.max_theta)
         
         # TODO: layer parameter
-        self.out_vote_dim = 3 + self.in_dim + 1 # (r, z, theta) + (feature) + score
+        self.out_vote_dim = 4 if self.no_feature_refine else 4 + self.in_dim # (r, z, theta) + (feature) + score
         self.conv1 = torch.nn.Conv1d(self.in_dim, self.in_dim, 1)
         self.conv2 = torch.nn.Conv1d(self.in_dim, self.in_dim, 1)
         self.conv3 = torch.nn.Conv1d(self.in_dim, self.config.num_spatial_cls*self.out_vote_dim, 1)
@@ -264,10 +264,11 @@ class VotingModuleMultiDistance(nn.Module):
         
         vote_xyz = seed_xyz.unsqueeze(2) + offset_xyz # (batch_size, num_seed, num_spatial_cls, 3)
         
-        residual_features = net[..., 3:-1]
         if self.no_feature_refine:
-            vote_features = seed_features.transpose(2,1).unsqueeze(2) + residual_features * 0.0
+            vote_features = seed_features.transpose(2,1).unsqueeze(2) + \
+                torch.zeros((batch_size, num_seed, self.config.num_spatial_cls, self.in_dim)).cuda(seed_features.device)
         else:
+            residual_features = net[..., 3:-1]
             vote_features = seed_features.transpose(2,1).unsqueeze(2) + residual_features
 
         vote_spatial_score = net[..., -1]
