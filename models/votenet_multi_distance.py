@@ -50,7 +50,7 @@ class VoteNetMultiDistance(nn.Module):
                  input_feature_dim=0, num_proposal=128, vote_config=VoteConfigDistance(), 
                  sampling='sorted_fps', disable_top_n_votes=False, sorted_by_prob=False,
                  cluster_radius=0.3, cluster_nsample=16, backbone='standard', sorted_clustering=True,
-                 feature_attention=None, no_feature_norm=False):
+                 feature_attention=None, no_feature_norm=False, no_feature_refine=False):
         super().__init__()
 
         self.num_class = num_class
@@ -78,7 +78,7 @@ class VoteNetMultiDistance(nn.Module):
             self.backbone_net = Pointnet2BackboneShallow(input_feature_dim=self.input_feature_dim)
 
         # Hough voting
-        self.vgen = VotingModuleMultiDistance(self.vote_config, 256)
+        self.vgen = VotingModuleMultiDistance(self.vote_config, 256, no_feature_refine)
 
         seed_feat_dim = 257 if self.feature_attention == 'cat' else 256
 

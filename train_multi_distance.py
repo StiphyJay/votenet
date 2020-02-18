@@ -197,12 +197,8 @@ print(len(TRAIN_DATALOADER), len(TEST_DATALOADER))
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_input_channel = int(FLAGS.use_color)*3 + int(not FLAGS.no_height)*1
 
-if FLAGS.no_feature_refine:
-    MODEL = importlib.import_module('votenet_multi_distance_no_feature_refine') # import network module
-    Detector = MODEL.VoteNetMultiDistance_no_feature_refine
-else:
-    MODEL = importlib.import_module('votenet_multi_distance') # import network module
-    Detector = MODEL.VoteNetMultiDistance
+MODEL = importlib.import_module('votenet_multi_distance') # import network module
+Detector = MODEL.VoteNetMultiDistance
 
 net = Detector(num_class=DATASET_CONFIG.num_class,
                num_heading_bin=DATASET_CONFIG.num_heading_bin,
@@ -219,7 +215,8 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                backbone=FLAGS.backbone,
                sorted_clustering=FLAGS.enable_sorted_clustering,
                feature_attention=FLAGS.feature_attention,
-               no_feature_norm=FLAGS.no_feature_norm)
+               no_feature_norm=FLAGS.no_feature_norm,
+               no_feature_refine=FLAGS.no_feature_refine)
 
 if torch.cuda.device_count() > 1:
   log_string("Let's use %d GPUs!" % (torch.cuda.device_count()))
