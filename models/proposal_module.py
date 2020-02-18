@@ -179,9 +179,7 @@ class ProposalModuleMulti(nn.Module):
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
         elif self.sampling == 'random':
             # Random sampling from the votes
-            sample_inds = torch.randint(0, num_seed, (batch_size, self.num_seed_fps), dtype=torch.int).cuda()
-            sample_inds *= self.num_vote
-            sample_inds = torch.cat([(sample_inds + i) for i in range(self.num_vote)], dim=1)
+            sample_inds = torch.randint(0, num_seed*self.num_vote, (batch_size, self.num_proposal), dtype=torch.int).cuda()
             xyz, features, _ = self.vote_aggregation(xyz, features, sample_inds)
         elif self.sampling in ['sorted_fps', 'sorted_random']:
             vote_sorted_key = end_points['vote_sorted_key'] # (batch_size, num_seed*num_vote)

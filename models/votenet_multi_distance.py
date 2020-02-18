@@ -152,6 +152,8 @@ class VoteNetMultiDistance(nn.Module):
             
         end_points = self.pnet(end_points['vote_xyz'], end_points['vote_features'], end_points)
 
+        end_points['top_n'] = not self.disable_top_n_votes
+
         return end_points
 
 
