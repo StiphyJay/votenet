@@ -78,7 +78,6 @@ def compute_vote_loss(end_points):
         seed_vote_num_hist = torch.zeros((batch_size, int(num_vote+1)), device=vote_best_n_seed_inds.device)
         for i in range(batch_size):
             seed_vote_num_hist[i] = torch.histc(seed_vote_hist[i], bins=int(num_vote+1), min=-0.5, max=num_vote+0.5)
-        end_points['max_multi_votes'] = seed_vote_num_hist[:, 2].max().item() if seed_vote_num_hist.size(1) > 2 else 0
         end_points['seed_vote_num_hist'] = seed_vote_num_hist.mean(dim=0)
 
         # top 1 score

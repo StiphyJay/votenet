@@ -232,8 +232,6 @@ def evaluate_one_epoch():
     vote_cls_loss_weight = get_current_vote_cls_loss_weight(epoch)
     net.eval() # set model to eval mode (for bn and dp)
 
-    max_multi_votes = 0
-
     for batch_idx, batch_data_label in enumerate(TEST_DATALOADER):
         if batch_idx % 10 == 0:
             print('Eval batch: %d'%(batch_idx))
@@ -253,9 +251,6 @@ def evaluate_one_epoch():
             assert(key not in end_points)
             end_points[key] = batch_data_label[key]
         loss, end_points = criterion(end_points, DATASET_CONFIG)
-
-        if end_points['max_multi_votes'] > max_multi_votes:
-            max_multi_votes = end_points['max_multi_votes']
 
         if FLAGS.compute_false_stat:
             batch_size = float(end_points['objectness_scores'].size(0))
@@ -322,8 +317,6 @@ def evaluate_one_epoch():
         else:
             temp = stat_dict[key]/(float(batch_idx+1))
             log_string('eval mean {}: {}'.format(key, temp.tolist()))
-
-    log_string('eval max multi votes: {}'.format(max_multi_votes))
 
     # Evaluate average precision
     for i, ap_calculator in enumerate(ap_calculator_list):
