@@ -70,7 +70,7 @@ class Pointnet2BackboneDeeper(nn.Module):
         
         self.sa5 = PointnetSAModuleVotes(
                 npoint=128,
-                radius=1.4,
+                radius=1.6,
                 nsample=12,
                 mlp=[256, 128, 256, 256],
                 use_xyz=True,
@@ -79,9 +79,9 @@ class Pointnet2BackboneDeeper(nn.Module):
         
         self.sa6 = PointnetSAModuleVotes(
                 npoint=64,
-                radius=1.6,
+                radius=2.0,
                 nsample=8,
-                mlp=[256, 128, 256, 256],
+                mlp=[256, 256, 256, 256],
                 use_xyz=True,
                 normalize_xyz=True
             )
