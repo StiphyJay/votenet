@@ -72,7 +72,7 @@ class Pointnet2BackboneDeeper(nn.Module):
                 npoint=128,
                 radius=1.6,
                 nsample=12,
-                mlp=[256, 128, 256, 256],
+                mlp=[256, 256, 128, 256],
                 use_xyz=True,
                 normalize_xyz=True
             )
