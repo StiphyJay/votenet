@@ -146,9 +146,12 @@ class VoteNetMultiDistance(nn.Module):
             xyz_top_n_reshape = xyz_top_n.view(batch_size, -1, 3).contiguous() # (batch_size, num_seed*num_vote, 3)
             features_top_n_reshape = features_top_n.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous() # (batch_size, vote_feature_dim, num_seed*num_vote)
 
+            end_points['vote_top_n_spatial_cls'] = top_n_spatial_ind # (batch_size, num_seed, num_vote)
             end_points['vote_xyz'] = xyz_top_n_reshape # (batch_size, num_seed*num_vote, 3)
             end_points['vote_features'] = features_top_n_reshape # (batch_size, vote_feature_dim, num_seed*num_vote)
             end_points['vote_sorted_key'] = top_n_sorted_key.view(batch_size, -1).contiguous() # (batch_size, num_seed*num_vote)
+        
+        end_points['vote_xyz_train'] = xyz.view(batch_size, -1, 3).contiguous()
             
         end_points = self.pnet(end_points['vote_xyz'], end_points['vote_features'], end_points)
 

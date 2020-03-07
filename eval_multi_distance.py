@@ -37,7 +37,7 @@ parser.add_argument('--use_color', action='store_true', help='Use RGB color in i
 parser.add_argument('--backbone', default='standard', help='Depth of pointnet++.')
 parser.add_argument('--ckpt', default=None, help='Model checkpoint path [default: None]')
 parser.add_argument('--no_feature_refine', action='store_true', help='no_feature_refine.')
-parser.add_argument('--num_vote_heading', type=int, default=4, help='num_vote_heading for spatial discrete')
+parser.add_argument('--num_vote_heading', type=int, default=12, help='num_vote_heading for spatial discrete')
 parser.add_argument('--max_r', type=str, default='5.75', help='max_r')
 parser.add_argument('--max_z', type=str, default='1.6', help='max_z')
 parser.add_argument('--enable_top_n_votes', action='store_true', help='enable_top_n_votes.')
