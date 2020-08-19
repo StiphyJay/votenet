@@ -51,9 +51,7 @@ parser.add_argument('--feature_attention', type=str, default=None, help='feature
 parser.add_argument('--num_target', type=int, default=256, help='Point Number [default: 256]')
 parser.add_argument('--cluster_radius', type=float, default=0.3, help='cluster_radius')
 parser.add_argument('--cluster_nsample', type=int, default=16, help='cluster_nsample')
-parser.add_argument('--enable_entropy', action='store_true', help='enable_entropy.')
 parser.add_argument('--enable_mp', action='store_true', help='enable_mp.')
-parser.add_argument('--num_seed_kept', type=int, default=1024, help='num_seed_kept')
 
 # eval
 parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
@@ -161,8 +159,8 @@ TEST_DATALOADER = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE,
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_input_channel = int(FLAGS.use_color)*3 + int(not FLAGS.no_height)*1
 
-MODEL = importlib.import_module('votenet_multi_distance') # import network module
-Detector = MODEL.VoteNetMultiDistance
+MODEL = importlib.import_module('votenet_multi_cls') # import network module
+Detector = MODEL.VoteNetMultiCls
 
 net = Detector(num_class=DATASET_CONFIG.num_class,
                num_heading_bin=DATASET_CONFIG.num_heading_bin,
@@ -181,9 +179,7 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                feature_attention=FLAGS.feature_attention,
                no_feature_norm=FLAGS.no_feature_norm,
                no_feature_refine=FLAGS.no_feature_refine,
-               enable_entropy=FLAGS.enable_entropy,
-               enable_mp=FLAGS.enable_mp,
-               num_seed_kept=FLAGS.num_seed_kept)
+               enable_mp=FLAGS.enable_mp)
 
 net.to(device)
 criterion = MODEL.get_loss

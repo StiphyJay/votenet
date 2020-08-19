@@ -60,16 +60,14 @@ parser.add_argument('--enable_top_n_votes', action='store_true', help='enable_to
 parser.add_argument('--top_n_votes', type=int, default=3, help='Top n votes')
 parser.add_argument('--best_n_votes', type=int, default=1024, help='Best n votes')
 parser.add_argument('--sorted_by_score', action='store_true', help='sorted_by_score.')
-parser.add_argument('--cluster_sampling', default='sorted_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
+parser.add_argument('--cluster_sampling', default='vote_fps', help='Sampling strategy for vote clusters. [default: sorted_fps]')
 parser.add_argument('--enable_sorted_clustering', action='store_true', help='enable_sorted_clustering.')
 parser.add_argument('--no_feature_norm', action='store_true', help='no_feature_norm.')
 parser.add_argument('--feature_attention', type=str, default=None, help='feature_attention')
 parser.add_argument('--num_target', type=int, default=256, help='Proposal number [default: 256]')
 parser.add_argument('--cluster_radius', type=float, default=0.3, help='cluster_radius')
 parser.add_argument('--cluster_nsample', type=int, default=16, help='cluster_nsample')
-parser.add_argument('--enable_entropy', action='store_true', help='enable_entropy.')
 parser.add_argument('--enable_mp', action='store_true', help='enable_mp.')
-parser.add_argument('--num_seed_kept', type=int, default=1024, help='num_seed_kept')
 
 # train
 parser.add_argument('--batch_size', type=int, default=8, help='Batch Size during training [default: 8]')
@@ -200,8 +198,8 @@ print(len(TRAIN_DATALOADER), len(TEST_DATALOADER))
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_input_channel = int(FLAGS.use_color)*3 + int(not FLAGS.no_height)*1
 
-MODEL = importlib.import_module('votenet_multi_distance') # import network module
-Detector = MODEL.VoteNetMultiDistance
+MODEL = importlib.import_module('votenet_multi_cls') # import network module
+Detector = MODEL.VoteNetMultiCls
 
 net = Detector(num_class=DATASET_CONFIG.num_class,
                num_heading_bin=DATASET_CONFIG.num_heading_bin,
@@ -220,9 +218,7 @@ net = Detector(num_class=DATASET_CONFIG.num_class,
                feature_attention=FLAGS.feature_attention,
                no_feature_norm=FLAGS.no_feature_norm,
                no_feature_refine=FLAGS.no_feature_refine,
-               enable_entropy=FLAGS.enable_entropy,
-               enable_mp=FLAGS.enable_mp,
-               num_seed_kept=FLAGS.num_seed_kept)
+               enable_mp=FLAGS.enable_mp)
 
 if torch.cuda.device_count() > 1:
   log_string("Let's use %d GPUs!" % (torch.cuda.device_count()))

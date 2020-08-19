@@ -21,14 +21,14 @@ from backbone_module import Pointnet2Backbone
 from backbone_module_deep import Pointnet2BackboneDeep
 from backbone_module_deeper import Pointnet2BackboneDeeper
 from backbone_module_shallow import Pointnet2BackboneShallow
-from voting_module import VotingModuleMultiDistance
+from voting_module import VotingModuleCls
 from model_util_vote import VoteConfigDistance
-from proposal_module import ProposalModuleMulti
+from proposal_module import ProposalModuleCls
 from dump_helper_multi import dump_results
-from loss_helper_multi import get_loss
+from loss_helper_cls import get_loss
 
 
-class VoteNetMultiDistance(nn.Module):
+class VoteNetMultiCls(nn.Module):
     r"""
         Based on origin code by Charles et al., support real multi-vote.
 
@@ -48,10 +48,10 @@ class VoteNetMultiDistance(nn.Module):
 
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
                  input_feature_dim=0, num_proposal=128, vote_config=VoteConfigDistance(), 
-                 sampling='sorted_fps', disable_top_n_votes=False, sorted_by_prob=False,
+                 sampling='vote_fps', disable_top_n_votes=False, sorted_by_prob=False,
                  cluster_radius=0.3, cluster_nsample=16, backbone='standard', sorted_clustering=True,
                  feature_attention=None, no_feature_norm=False, no_feature_refine=False,
-                 enable_entropy=False, enable_mp=False, num_seed_kept=1024):
+                 enable_mp=False):
         super().__init__()
 
         self.num_class = num_class
@@ -67,9 +67,7 @@ class VoteNetMultiDistance(nn.Module):
         self.sorted_by_prob = sorted_by_prob
         self.feature_attention = feature_attention
         self.no_feature_norm = no_feature_norm
-        self.enable_entropy = enable_entropy
         self.enable_mp = enable_mp
-        self.num_seed_kept = num_seed_kept
 
         # Backbone point feature learning
         if backbone == 'standard':
@@ -82,12 +80,12 @@ class VoteNetMultiDistance(nn.Module):
             self.backbone_net = Pointnet2BackboneShallow(input_feature_dim=self.input_feature_dim)
 
         # Hough voting
-        self.vgen = VotingModuleMultiDistance(self.vote_config, 256, no_feature_refine)
+        self.vgen = VotingModuleCls(self.vote_config, 256, no_feature_refine)
 
         seed_feat_dim = 257 if self.feature_attention == 'cat' else 256
 
         # Vote aggregation and detection  # TODO: if to change num_proposal
-        self.pnet = ProposalModuleMulti(num_class, num_heading_bin, num_size_cluster,
+        self.pnet = ProposalModuleCls(num_class, num_heading_bin, num_size_cluster,
                                         mean_size_arr, num_proposal, sampling, seed_feat_dim=seed_feat_dim,
                                         vote_config=self.vote_config, radius=cluster_radius,
                                         nsample=cluster_nsample, sorted_clustering=sorted_clustering)
@@ -108,7 +106,6 @@ class VoteNetMultiDistance(nn.Module):
             end_points: dict
         """
         end_points = {}
-        batch_size = inputs['point_clouds'].shape[0]
 
         end_points = self.backbone_net(inputs['point_clouds'], end_points)
                 
@@ -120,65 +117,19 @@ class VoteNetMultiDistance(nn.Module):
         end_points['seed_features'] = features
         
         xyz, features, spatial_score = self.vgen(xyz, features)
-        end_points['vote_xyz_train'] = xyz.view(batch_size, -1, 3).contiguous()
-        vote_feature_dim = features.size(-1)
         if (not self.no_feature_norm):
-            features_norm = torch.norm(features, p=2, dim=3)
-            features = features.div(features_norm.unsqueeze(3))
+            features_norm = torch.norm(features, p=2, dim=2)
+            features = features.div(features_norm.unsqueeze(2))
         end_points['vote_spatial_score'] = spatial_score # (batch_size, num_seed, num_spatial_cls)
-        vote_sorted_key = F.softmax(spatial_score, dim=2) if self.sorted_by_prob else spatial_score
-
-        if self.enable_entropy:
-            seed_entropy = torch.sum(vote_sorted_key*torch.log(vote_sorted_key), dim=2)  # (batch_size, num_seed)
-            _, seed_best_n_ind = torch.topk(seed_entropy, self.num_seed_kept, 1) 
-            NC = xyz.size(2)
-            ND = features.size(3)
-            seed_best_n_ind_expand = seed_best_n_ind.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, NC, 3)
-            xyz = torch.gather(xyz, 1, seed_best_n_ind_expand)
-            seed_best_n_ind_expand = seed_best_n_ind.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, NC, ND)
-            features = torch.gather(features, 1, seed_best_n_ind_expand)
-            seed_best_n_ind_expand = seed_best_n_ind.unsqueeze(-1).repeat(1, 1, NC)
-            vote_sorted_key = torch.gather(vote_sorted_key, 1, seed_best_n_ind_expand)
-        
-        if self.enable_mp:
-            seed_mp, _ = torch.max(vote_sorted_key, dim=2)
-            _, seed_best_n_ind = torch.topk(seed_mp, self.num_seed_kept, 1)
-            NC = xyz.size(2)
-            ND = features.size(3)
-            seed_best_n_ind_expand = seed_best_n_ind.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, NC, 3)
-            xyz = torch.gather(xyz, 1, seed_best_n_ind_expand)
-            seed_best_n_ind_expand = seed_best_n_ind.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, NC, ND)
-            features = torch.gather(features, 1, seed_best_n_ind_expand)
-            seed_best_n_ind_expand = seed_best_n_ind.unsqueeze(-1).repeat(1, 1, NC)
-            vote_sorted_key = torch.gather(vote_sorted_key, 1, seed_best_n_ind_expand)
-
-        if self.disable_top_n_votes:
-            end_points['vote_xyz'] = xyz.view(batch_size, -1, 3).contiguous()
-            end_points['vote_sorted_key'] = vote_sorted_key.view(batch_size, -1).contiguous()
-            
-            features = features.view(batch_size, -1, vote_feature_dim)
-            if self.feature_attention == 'cat':
-                features = torch.cat((features, end_points['vote_sorted_key'].unsqueeze(2)), dim=2)
-            elif self.feature_attention == 'norm':
-                assert self.sorted_by_prob
-                features *= end_points['vote_sorted_key'].unsqueeze(2)
-
-            end_points['vote_features'] = features.transpose(1, 2).contiguous()
+        vote_sorted_key = F.softmax(spatial_score, dim=2)
+        if not self.enable_mp:
+            end_points['vote_pruning_key'] = torch.sum(vote_sorted_key*torch.log(vote_sorted_key), dim=2) # (batch_size, num_seed)
         else:
-            # choose top_n_votes
-            top_n_sorted_key, top_n_spatial_ind = torch.topk(vote_sorted_key, self.vote_config.top_n_votes, dim=2) # (batch_size, num_seed, num_vote)
-            top_n_spatial_ind_expand = top_n_spatial_ind.unsqueeze(-1).repeat(1,1,1,3)
-            xyz_top_n = torch.gather(xyz, 2, top_n_spatial_ind_expand) # (batch_size, num_seed, num_vote, 3)
-            top_n_spatial_ind_expand = top_n_spatial_ind.unsqueeze(-1).repeat(1,1,1,vote_feature_dim)
-            features_top_n = torch.gather(features, 2, top_n_spatial_ind_expand) # (batch_size, num_seed, num_vote, vote_feature_dim)
+            end_points['vote_pruning_key'], _ = torch.max(vote_sorted_key, dim=2) # (batch_size, num_seed)
 
-            xyz_top_n_reshape = xyz_top_n.view(batch_size, -1, 3).contiguous() # (batch_size, num_seed*num_vote, 3)
-            features_top_n_reshape = features_top_n.view(batch_size, -1, vote_feature_dim).transpose(1, 2).contiguous() # (batch_size, vote_feature_dim, num_seed*num_vote)
-
-            end_points['vote_top_n_spatial_cls'] = top_n_spatial_ind # (batch_size, num_seed, num_vote)
-            end_points['vote_xyz'] = xyz_top_n_reshape # (batch_size, num_seed*num_vote, 3)
-            end_points['vote_features'] = features_top_n_reshape # (batch_size, vote_feature_dim, num_seed*num_vote)
-            end_points['vote_sorted_key'] = top_n_sorted_key.view(batch_size, -1).contiguous() # (batch_size, num_seed*num_vote)
+        end_points['vote_xyz'] = xyz
+        end_points['vote_features'] = features.transpose(1, 2).contiguous()
+        end_points['vote_xyz_train'] = xyz
             
         end_points = self.pnet(end_points['vote_xyz'], end_points['vote_features'], end_points)
 

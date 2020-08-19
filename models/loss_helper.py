@@ -13,8 +13,8 @@ ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 from nn_distance import nn_distance, huber_loss
 
-FAR_THRESHOLD = 0.6
-NEAR_THRESHOLD = 0.3
+FAR_THRESHOLD = 1.0
+NEAR_THRESHOLD = 0.8
 GT_VOTE_FACTOR = 3 # number of GT votes per point
 OBJECTNESS_CLS_WEIGHTS = [0.2,0.8] # put larger weights on positive objectness
 
@@ -95,6 +95,24 @@ def compute_objectness_loss(end_points):
     objectness_label[euclidean_dist1<NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1<NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1>FAR_THRESHOLD] = 1
+
+    # vote pos/neg
+    vote_xyz = end_points['vote_xyz']
+    K_vote = vote_xyz.shape[1]
+    dist1_vote, _, _, _ = nn_distance(vote_xyz, gt_center) # dist1: BxK, dist2: BxK2
+
+    euclidean_dist1_vote = torch.sqrt(dist1_vote+1e-6)
+    objectness_label_vote = torch.zeros((B,K_vote), dtype=torch.long).cuda()
+    objectness_mask_vote = torch.zeros((B,K_vote)).cuda()
+    objectness_label_vote[euclidean_dist1_vote<NEAR_THRESHOLD] = 1
+    objectness_mask_vote[euclidean_dist1_vote<NEAR_THRESHOLD] = 1
+    objectness_mask_vote[euclidean_dist1_vote>FAR_THRESHOLD] = 1
+
+    total_num_vote = objectness_label_vote.shape[0]*objectness_label_vote.shape[1]
+    end_points['pos_vote_ratio'] = \
+        torch.sum(objectness_label_vote.float().cuda())/float(total_num_vote)
+    end_points['neg_vote_ratio'] = \
+        torch.sum(objectness_mask_vote.float())/float(total_num_vote) - end_points['pos_vote_ratio']
 
     # Compute objectness loss
     objectness_scores = end_points['objectness_scores']
