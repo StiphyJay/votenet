@@ -55,56 +55,11 @@ def compute_vote_loss(end_points):
     seed_gt_votes = torch.gather(end_points['vote_label'], 1, seed_inds_expand)
     seed_gt_votes += end_points['seed_xyz']
 
-    '''
-    if not end_points['top_n']:
-        # Compute multi vote statistics
-        num_vote = vote_xyz.size(1) / num_seed
-        vote_best_n_seed_inds = end_points['vote_best_n_inds'] / num_vote # (B, best_n), 0 ~ num_seed -1
-
-        # Compute num_valid_vote per positive seed
-        vote_best_n_mask = torch.gather(seed_gt_votes_mask, 1, vote_best_n_seed_inds)
-        end_points['pos_seed_vote_ratio'] = torch.sum(vote_best_n_mask).float() / torch.sum(seed_gt_votes_mask).float()
-        pos_vote_seed_ind = ((vote_best_n_seed_inds + 1) * vote_best_n_mask).float()
-        pos_seed_vote_hist = torch.zeros((batch_size, num_seed), device=vote_best_n_seed_inds.device)
-        for i in range(batch_size):
-            pos_seed_vote_hist[i] = torch.histc(pos_vote_seed_ind[i], bins=num_seed, min=0.5, max=num_seed+0.5)
-        end_points['pos_seed_vote_max_ratio'] = pos_seed_vote_hist.max(dim=1).values.mean()
-
-        vote_best_n_seed_inds = vote_best_n_seed_inds.float()
-        seed_vote_hist = torch.zeros((batch_size, num_seed), device=vote_best_n_seed_inds.device)
-        for i in range(batch_size):
-            seed_vote_hist[i] = torch.histc(vote_best_n_seed_inds[i], bins=num_seed, min=-0.5, max=num_seed-0.5)
-        end_points['seed_vote_max_ratio'] = seed_vote_hist.max(dim=1).values.mean()
-    
-        seed_vote_num_hist = torch.zeros((batch_size, int(num_vote+1)), device=vote_best_n_seed_inds.device)
-        for i in range(batch_size):
-            seed_vote_num_hist[i] = torch.histc(seed_vote_hist[i], bins=int(num_vote+1), min=-0.5, max=num_vote+0.5)
-        end_points['seed_vote_num_hist'] = seed_vote_num_hist.mean(dim=0)
-
-        # top 1 score
-        vote_spatial_prob_top1 = end_points['vote_sorted_key'].view(batch_size, num_seed, -1).max(dim=2).values.view(-1) # (batch_size*num_seed)
-        vote_spatial_prob_top1_hist = torch.histc(vote_spatial_prob_top1, bins=20, min=0.0, max=1.0)
-        end_points['vote_spatial_prob_top1_hist'] = vote_spatial_prob_top1_hist.float() / batch_size
-    '''
-
     # spatial class loss
     vote_spatial_score_reshape = end_points['vote_spatial_score'].transpose(1, 2).contiguous() # (batch_size, num_spatial_cls, num_seed)
     seed_gt_votes_cls = torch.gather(end_points['vote_label_cls'], 1, seed_inds) # (batch_size, num_seed)
     vote_cls_error = F.cross_entropy(vote_spatial_score_reshape, seed_gt_votes_cls, reduction='none')
     vote_cls_loss = torch.sum(vote_cls_error*seed_gt_votes_mask.float()) / (torch.sum(seed_gt_votes_mask.float())+1e-6)
-
-    """
-    # gt recall
-    if not end_points['top_n']:
-        vote_best_n_seed_inds = vote_best_n_seed_inds.long()
-        vote_best_n_gt = torch.gather(seed_gt_votes_cls, 1, vote_best_n_seed_inds)
-        vote_best_n_pred = end_points['vote_best_n_inds'] % num_vote        
-        end_points['gt_recall_ratio'] = (vote_best_n_mask * (vote_best_n_gt == vote_best_n_pred).long()).sum().float() \
-                                        / vote_best_n_mask.sum().float()
-    else:
-        end_points['gt_recall_ratio'] = (seed_gt_votes_mask * (seed_gt_votes_cls == end_points['vote_top_n_spatial_cls'].squeeze()).long()).sum().float() \
-                                        / seed_gt_votes_mask.sum().float()
-    """
 
     # Compute the min of min of distance
     vote_xyz_reshape = vote_xyz.view(batch_size*num_seed, -1, 3) # from B,num_seed*num_vote,3 to B*num_seed,num_vote,3
@@ -145,26 +100,6 @@ def compute_objectness_loss(end_points):
     objectness_label[euclidean_dist1<NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1<NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1>FAR_THRESHOLD] = 1
-
-    '''
-    # vote pos/neg
-    vote_xyz = end_points['vote_best_n_xyz']
-    K_vote = vote_xyz.shape[1]
-    dist1_vote, _, _, _ = nn_distance(vote_xyz, gt_center) # dist1: BxK, dist2: BxK2
-
-    euclidean_dist1_vote = torch.sqrt(dist1_vote+1e-6)
-    objectness_label_vote = torch.zeros((B,K_vote), dtype=torch.long).cuda()
-    objectness_mask_vote = torch.zeros((B,K_vote)).cuda()
-    objectness_label_vote[euclidean_dist1_vote<NEAR_THRESHOLD] = 1
-    objectness_mask_vote[euclidean_dist1_vote<NEAR_THRESHOLD] = 1
-    objectness_mask_vote[euclidean_dist1_vote>FAR_THRESHOLD] = 1
-
-    total_num_vote = objectness_label_vote.shape[0]*objectness_label_vote.shape[1]
-    end_points['pos_vote_ratio'] = \
-        torch.sum(objectness_label_vote.float().cuda())/float(total_num_vote)
-    end_points['neg_vote_ratio'] = \
-        torch.sum(objectness_mask_vote.float())/float(total_num_vote) - end_points['pos_vote_ratio']
-    '''
 
     # Compute objectness loss
     objectness_scores = end_points['objectness_scores']
